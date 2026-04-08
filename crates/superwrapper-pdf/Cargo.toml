@@ -1,0 +1,33 @@
+[package]
+name = "superwrapper-pdf"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Unified PDF extraction and conversion engine"
+
+[dependencies]
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+rayon.workspace = true
+tempfile = "3"
+
+pdf_oxide = { version = "0.3", features = ["parallel"] }
+unpdf = { version = "0.2", optional = true }
+pdfium-render = { version = "0.8", optional = true }
+image = { version = "0.25", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+assert_fs = "1"
+pretty_assertions = "1"
+
+[features]
+default = ["structured"]
+structured = ["dep:unpdf"]
+visual = ["dep:pdfium-render", "dep:image"]
+all = ["structured", "visual"]
+
+[profile.release]
+lto = true
+codegen-units = 1

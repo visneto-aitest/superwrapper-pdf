@@ -1,0 +1,17 @@
+[workspace]
+
+[package]
+name = "superwrapper-pdf-python"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Python bindings for superwrapper-pdf"
+publish = false
+
+[lib]
+name = "superwrapper_pdf"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+pyo3 = { version = "0.28", features = ["extension-module"] }
+superwrapper-pdf = { path = "../../crates/superwrapper-pdf", default-features = false, features = ["structured"] }

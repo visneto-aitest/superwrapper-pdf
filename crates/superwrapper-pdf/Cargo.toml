@@ -21,12 +21,19 @@ image = { version = "0.25", optional = true }
 tempfile = "3"
 assert_fs = "1"
 pretty_assertions = "1"
+criterion = { workspace = true }
+tokio = { workspace = true }
 
 [features]
 default = ["structured"]
 structured = ["dep:unpdf"]
 visual = ["dep:pdfium-render", "dep:image"]
-all = ["structured", "visual"]
+async = []
+all = ["structured", "visual", "async"]
+
+[[bench]]
+name = "extraction_benchmark"
+harness = false
 
 [profile.release]
 lto = true

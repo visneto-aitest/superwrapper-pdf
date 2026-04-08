@@ -1,3 +1,23 @@
+//! FastEngine implementation using pdf_oxide
+//!
+//! This engine provides high-speed plain text extraction optimized for raw performance.
+//! It's the default choice when speed is the primary concern and structured output
+//! is not required.
+//!
+//! # Performance Characteristics
+//!
+//! - **Speed**: ⚡⚡⚡ (fastest of all engines)
+//! - **Memory**: Low footprint
+//! - **Output**: Plain text only
+//! - **Dependencies**: None (pdf_oxide is always included)
+//!
+//! # When to Use FastEngine
+//!
+//! - Batch processing large numbers of PDFs
+//! - Text extraction where format doesn't matter
+//! - Resource-constrained environments
+//! - When you need the quickest possible extraction
+
 use crate::engine::PdfEngine;
 use crate::error::{Result, SuperWrapperError};
 use crate::types::{ExtractionConfig, ExtractionResult, PageInfo};
@@ -5,11 +25,29 @@ use pdf_oxide::document::PdfDocument;
 use std::io::Write;
 use std::path::Path;
 
+/// FastEngine - Optimized for speed over all other concerns
+///
+/// This engine uses pdf_oxide to extract plain text from PDFs with minimal overhead.
+/// It's the default engine and has no optional feature requirements.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use superwrapper_pdf::{FastEngine, PdfEngine, ExtractionConfig};
+/// use std::path::Path;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let engine = FastEngine;
+/// let config = ExtractionConfig::default();
+/// let result = engine.extract(Path::new("document.pdf"), &config)?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct FastEngine;
 
 impl PdfEngine for FastEngine {
     fn name(&self) -> &'static str {
-        "fast (pdf_oxide)"
+        "FastEngine"
     }
 
     fn extract(&self, path: &Path, config: &ExtractionConfig) -> Result<ExtractionResult> {
@@ -234,7 +272,7 @@ mod tests {
     #[test]
     fn test_fast_engine_name() {
         let engine = FastEngine;
-        assert_eq!(engine.name(), "fast (pdf_oxide)");
+        assert_eq!(engine.name(), "FastEngine");
     }
 
     #[test]

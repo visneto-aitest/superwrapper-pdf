@@ -1,0 +1,41 @@
+[build-system]
+requires = ["maturin>=1.0"]
+build-backend = "maturin"
+
+[project]
+name = "superwrapper-pdf"
+version = "0.1.0"
+description = "Python bindings for superwrapper-pdf"
+readme = "README.md"
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Text Processing :: Markup",
+]
+dependencies = []
+authors = [
+    {name = "Kong", email = "kong@example.com"},
+]
+maintainers = [
+    {name = "Kong", email = "kong@example.com"},
+]
+
+[tool.maturin]
+module-name = "_superwrapper_pdf_internal"
+features = ["pyo3/extension-module"]
+
+[project.urls]
+Homepage = "https://github.com/kong/superwrapper-pdf"
+Repository = "https://github.com/kong/superwrapper-pdf"
+Documentation = "https://github.com/kong/superwrapper-pdf#readme"
+Issues = "https://github.com/kong/superwrapper-pdf/issues"

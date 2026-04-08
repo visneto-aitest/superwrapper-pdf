@@ -9,7 +9,7 @@ pub struct VisualEngine;
 
 impl PdfEngine for VisualEngine {
     fn name(&self) -> &'static str {
-        "visual (pdfium-render)"
+        "VisualEngine"
     }
 
     fn extract(&self, path: &Path, config: &ExtractionConfig) -> Result<ExtractionResult> {
@@ -112,7 +112,7 @@ mod tests {
     #[test]
     fn test_visual_engine_name() {
         let engine = VisualEngine;
-        assert_eq!(engine.name(), "visual (pdfium-render)");
+        assert_eq!(engine.name(), "VisualEngine");
     }
 
     #[test]

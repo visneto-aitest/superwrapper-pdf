@@ -8,7 +8,7 @@ pub struct StructuredEngine;
 
 impl PdfEngine for StructuredEngine {
     fn name(&self) -> &'static str {
-        "structured (unpdf)"
+        "StructuredEngine"
     }
 
     fn extract(&self, path: &Path, config: &ExtractionConfig) -> Result<ExtractionResult> {
@@ -125,7 +125,7 @@ mod tests {
     #[test]
     fn test_structured_engine_name() {
         let engine = StructuredEngine;
-        assert_eq!(engine.name(), "structured (unpdf)");
+        assert_eq!(engine.name(), "StructuredEngine");
     }
 
     #[test]

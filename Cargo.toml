@@ -1,5 +1,11 @@
 [workspace]
-members = ["crates/*"]
+members = [
+    "crates/*",
+    "examples/fast",
+    "examples/structured",
+    "examples/visual",
+    "examples/async"
+]
 resolver = "2"
 
 [workspace.package]
@@ -13,6 +19,8 @@ thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 rayon = "1.10"
+criterion = "0.5"
+tokio = { version = "1.0", features = ["full"] }
 
 [workspace.metadata.tarpaulin]
 features = "all"

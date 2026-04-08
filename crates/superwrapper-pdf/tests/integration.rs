@@ -13,19 +13,19 @@ fn minimal_pdf() -> std::path::PathBuf {
 #[test]
 fn test_fast_engine_can_be_created() {
     let engine = FastEngine;
-    assert_eq!(engine.name(), "fast (pdf_oxide)");
+    assert_eq!(engine.name(), "FastEngine");
 }
 
 #[test]
 fn test_structured_engine_can_be_created() {
     let engine = StructuredEngine;
-    assert_eq!(engine.name(), "structured (unpdf)");
+    assert_eq!(engine.name(), "StructuredEngine");
 }
 
 #[test]
 fn test_visual_engine_can_be_created() {
     let engine = VisualEngine;
-    assert_eq!(engine.name(), "visual (pdfium-render)");
+    assert_eq!(engine.name(), "VisualEngine");
 }
 
 #[test]

@@ -52,52 +52,130 @@ superwrapper-pdf = { version = "0.1", features = ["structured", "visual"] }
 |---------|-------------|
 | `structured` | Enable StructuredEngine (uses `unpdf` crate) |
 | `visual` | Enable VisualEngine (uses `pdfium-render` crate) |
+| `async` | Enable async support for all engines |
 | `all` | Enable all optional engines |
 
 ## Usage
 
-### Basic Text Extraction (FastEngine)
+### Examples
+
+The crate includes comprehensive examples demonstrating various usage patterns:
+
+#### FastEngine Example
+Quick text extraction optimized for speed:
 
 ```rust
-use superwrapper_pdf::{FastEngine, PdfEngine, ExtractionConfig, ExtractionMode};
+use superwrapper_pdf::{FastEngine, PdfEngine, ExtractionConfig};
+use std::path::Path;
 
-let engine = FastEngine;
-let config = ExtractionConfig::default();
-
-let result = engine.extract("document.pdf", &config).unwrap();
-
-println!("Extracted {} characters", result.text.len());
-println!("Total pages: {}", result.page_count);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let engine = FastEngine;
+    let config = ExtractionConfig::default();
+    
+    let result = engine.extract(Path::new("document.pdf"), &config)?;
+    
+    println!("Extracted {} characters from {} pages", 
+             result.text.len(), result.page_count);
+    
+    Ok(())
+}
 ```
 
-### Markdown Extraction (StructuredEngine)
+#### StructuredEngine Example
+Markdown conversion with parallel processing:
 
 ```rust
 use superwrapper_pdf::{StructuredEngine, PdfEngine, ExtractionConfig, ExtractionMode};
+use std::path::Path;
 
-let engine = StructuredEngine;
-let config = ExtractionConfig {
-    mode: ExtractionMode::Structured { 
-        parallel: true  // Enable parallel extraction
-    },
-    ..Default::default()
-};
-
-let result = engine.extract("document.pdf", &config).unwrap();
-
-// Get markdown-formatted content
-println!("{}", result.markdown);
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let engine = StructuredEngine;
+    let config = ExtractionConfig {
+        mode: ExtractionMode::Structured,
+        parallel: true,  // Enable parallel extraction
+        ..Default::default()
+    };
+    
+    let result = engine.extract(Path::new("document.pdf"), &config)?;
+    
+    println!("Generated {} characters of markdown", result.markdown.len());
+    
+    Ok(())
+}
 ```
 
-### PDF to Image Rendering (VisualEngine)
+#### VisualEngine Example
+PDF-to-image rendering with configurable DPI and format:
 
 ```rust
 use superwrapper_pdf::{VisualEngine, PdfEngine, ExtractionConfig, ExtractionMode, ImageFormat};
+use std::path::Path;
 
-let engine = VisualEngine;
-let config = ExtractionConfig {
-    mode: ExtractionMode::Visual { 
-        dpi: 150,
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let engine = VisualEngine;
+    let config = ExtractionConfig {
+        mode: ExtractionMode::Visual { 
+            dpi: 300,
+            format: ImageFormat::Jpeg(85),  // or ImageFormat::Png
+        },
+        ..Default::default()
+    };
+    
+    let result = engine.extract(Path::new("document.pdf"), &config)?;
+    
+    println!("Rendered {} pages as images", result.pages.len());
+    
+    Ok(())
+}
+```
+
+#### Async Example
+Concurrent processing using Tokio:
+
+```rust
+use superwrapper_pdf::{PdfEngine, ExtractionConfig, ExtractionMode};
+use std::path::Path;
+use tokio::task;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Process multiple PDFs concurrently
+    let fast_task = task::spawn(async {
+        let engine = superwrapper_pdf::FastEngine;
+        let config = ExtractionConfig::default();
+        engine.extract(Path::new("document1.pdf"), &config)
+    });
+    
+    let structured_task = task::spawn(async {
+        let engine = superwrapper_pdf::StructuredEngine;
+        let config = ExtractionConfig {
+            mode: ExtractionMode::Structured,
+            parallel: true,
+            ..Default::default()
+        };
+        engine.extract(Path::new("document2.pdf"), &config)
+    });
+    
+    // Wait for both operations to complete
+    let (fast_result, structured_result) = tokio::join!(fast_task, structured_task);
+    
+    println!("Fast extraction: {:?}", fast_result);
+    println!("Structured extraction: {:?}", structured_result);
+    
+    Ok(())
+}
+```
+
+### Async Support
+
+SuperWrapper-PDF includes optional async support that allows you to process PDFs concurrently. When the `async` feature is enabled, all engines implement the `extract_async` method which can be used with async runtimes like Tokio:
+
+```toml
+superwrapper-pdf = { version = "0.1", features = ["all", "async"] }
+tokio = { version = "1.0", features = ["full"] }
+```
+
+The async implementation leverages Tokio's thread pool to run CPU-intensive PDF processing operations without blocking the async executor.
         format: ImageFormat::Png,  // or ImageFormat::Jpeg(80)
     },
     ..Default::default()
@@ -185,6 +263,12 @@ All engines implement the `PdfEngine` trait:
 pub trait PdfEngine {
     fn name(&self) -> &'static str;
     fn extract(&self, path: &Path, config: &ExtractionConfig) -> Result<ExtractionResult>;
+    
+    #[cfg(feature = "async")]
+    fn extract_async(&self, path: &Path, config: &ExtractionConfig) -> Result<ExtractionResult> {
+        // Default implementation falls back to sync extraction
+        self.extract(path, config)
+    }
 }
 ```
 

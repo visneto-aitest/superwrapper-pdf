@@ -1,0 +1,38 @@
+{
+  "name": "superwrapper-pdf",
+  "version": "0.1.0",
+  "description": "Node.js bindings for superwrapper-pdf",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "scripts": {
+    "build": "node-gyp configure && node-gyp build",
+    "build-debug": "node-gyp configure --debug && node-gyp build",
+    "clean": "node-gyp clean",
+    "install": "npm run build",
+    "test": "node test/test.js"
+  },
+  "keywords": [
+    "pdf",
+    "extraction",
+    "text",
+    "markdown",
+    "nodejs",
+    "native",
+    "rust"
+  ],
+  "author": "Kong <kong@example.com>",
+  "license": "MIT",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kong/superwrapper-pdf.git"
+  },
+  "dependencies": {
+    "node-addon-api": "^7.0.0"
+  },
+  "devDependencies": {
+    "node-gyp": "^9.4.0"
+  }
+}

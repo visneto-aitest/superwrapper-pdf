@@ -1,0 +1,11 @@
+[package]
+name = "visual-example"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "visual-example"
+path = "main.rs"
+
+[dependencies]
+superwrapper-pdf = { path = "../../crates/superwrapper-pdf", features = ["visual"] }

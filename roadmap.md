@@ -6,7 +6,7 @@ This roadmap outlines the planned development for superwrapper-pdf, a unified Ru
 
 - **Current Version**: 0.1.0
 - **License**: MIT OR Apache-2.0
-- **Repository**: github.com/sopaco/superwrapper-pdf
+- **Repository**: https://github.com/sopaco/superwrapper-pdf
 
 ---
 

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "model": "openai/gpt-4-turbo",
+  "provider": {
+    "openai": {
+      "options": {
+        "apiKey": "{env:KILO_API_KEY}"
+      }
+    }
+  },
+  "permission": {
+    "*": "ask",
+    "bash": "allow",
+    "edit": "ask"
+  },
+  "mcp": {
+    "servers": {}
+  },
+  "instructions": ["CONTRIBUTING.md"],
+  "disabled_providers": []
+}

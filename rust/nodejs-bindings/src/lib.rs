@@ -1,47 +1,106 @@
 use napi::bindgen_prelude::*;
+use napi_derive::napi;
 use std::path::PathBuf;
 
-use superwrapper_pdf::{ExtractionConfig, FastEngine, PdfEngine};
+use superwrapper_pdf::{
+    ExtractionConfig, ExtractionMode, FastEngine, ImageFormat, PdfEngine, StructuredEngine,
+    VisualEngine,
+};
 
-/// Extract PDF content
+/// Page information from extraction
+#[napi(object)]
+pub struct PageInfo {
+    pub page_number: u32,
+    pub text: String,
+    pub char_count: u32,
+}
+
+/// Result of PDF extraction
+#[napi(object)]
+pub struct ExtractionResult {
+    pub text: String,
+    pub markdown: String,
+    pub page_count: u32,
+    pub pages: Vec<PageInfo>,
+    pub source: Option<String>,
+}
+
+impl From<superwrapper_pdf::ExtractionResult> for ExtractionResult {
+    fn from(r: superwrapper_pdf::ExtractionResult) -> Self {
+        Self {
+            text: r.text,
+            markdown: r.markdown,
+            page_count: r.page_count,
+            pages: r
+                .pages
+                .into_iter()
+                .map(|p| PageInfo {
+                    page_number: p.page_number,
+                    text: p.text,
+                    char_count: p.char_count as u32,
+                })
+                .collect(),
+            source: r.source.map(|s| s.to_string_lossy().to_string()),
+        }
+    }
+}
+
+/// Extract PDF content using fast mode (default)
 #[napi]
-pub fn extract(path: String) -> Result<Object> {
+pub fn extract(path: String) -> Result<ExtractionResult> {
     let path_buf = PathBuf::from(&path);
     let config = ExtractionConfig::default();
     let engine: Box<dyn PdfEngine> = Box::new(FastEngine);
 
-    // Extract
-    let result = engine
-        .extract(&path_buf, &config)
-        .map_err(|e| Error::new(Status::GenericFailure, format!("Extraction failed: {}", e)))?;
+    let result = engine.extract(&path_buf, &config).map_err(|e| {
+        Error::new(
+            napi::Status::GenericFailure,
+            format!("Extraction failed: {}", e),
+        )
+    })?;
 
-    // Convert to JavaScript object
-    let mut obj = Object::new();
+    Ok(result.into())
+}
 
-    // Add text
-    obj.set("text", result.text)?;
+/// Extract PDF content using structured mode (markdown output)
+#[napi]
+pub fn extract_structured(path: String) -> Result<ExtractionResult> {
+    let path_buf = PathBuf::from(&path);
+    let config = ExtractionConfig {
+        mode: ExtractionMode::Structured,
+        ..Default::default()
+    };
+    let engine: Box<dyn PdfEngine> = Box::new(StructuredEngine);
 
-    // Add markdown
-    obj.set("markdown", result.markdown)?;
+    let result = engine.extract(&path_buf, &config).map_err(|e| {
+        Error::new(
+            napi::Status::GenericFailure,
+            format!("Extraction failed: {}", e),
+        )
+    })?;
 
-    // Add page count
-    obj.set("pageCount", result.page_count)?;
+    Ok(result.into())
+}
 
-    // Add pages array
-    let pages_array = Array::new();
-    for (i, page) in result.pages.into_iter().enumerate() {
-        let mut page_obj = Object::new();
-        page_obj.set("pageNumber", page.page_number)?;
-        page_obj.set("text", page.text)?;
-        page_obj.set("charCount", page.char_count)?;
-        pages_array.set_element(i as u32, page_obj)?;
-    }
-    obj.set("pages", pages_array)?;
+/// Extract PDF content using visual mode (returns text from rendered pages)
+#[napi]
+pub fn extract_visual(path: String, dpi: Option<u32>) -> Result<ExtractionResult> {
+    let path_buf = PathBuf::from(&path);
+    let config = ExtractionConfig {
+        mode: ExtractionMode::Visual {
+            dpi: dpi.unwrap_or(150),
+            format: ImageFormat::Png,
+        },
+        ..Default::default()
+    };
+    let engine: Box<dyn PdfEngine> = Box::new(VisualEngine);
 
-    // Add source (optional)
-    if let Some(source) = result.source {
-        obj.set("source", source.to_string_lossy().to_string())?;
-    }
+    let result = engine.extract(&path_buf, &config).map_err(|e| {
+        Error::new(
+            napi::Status::GenericFailure,
+            format!("Extraction failed: {}", e),
+        )
+    })?;
 
-    Ok(obj)
+    Ok(result.into())
 }

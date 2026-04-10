@@ -62,9 +62,9 @@
 //!
 //! match result {
 //!     Ok(extraction) => println!("Success: {} pages", extraction.page_count),
-//!     Err(SuperWrapperError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound =>
+//!     Err(SuperWrapperError::Io { source, .. }) if source.kind() == std::io::ErrorKind::NotFound =>
 //!         eprintln!("File not found"),
-//!     Err(SuperWrapperError::Encrypted) => eprintln!("Document requires password"),
+//!     Err(SuperWrapperError::Encrypted { .. }) => eprintln!("Document requires password"),
 //!     Err(e) => eprintln!("Other error: {:?}", e),
 //! }
 //! # Ok(())

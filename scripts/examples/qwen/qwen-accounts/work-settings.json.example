@@ -1,0 +1,19 @@
+{
+  "modelProviders": {
+    "openai": [
+      {
+        "id": "gpt-4-turbo",
+        "envKey": "OPENAI_API_KEY"
+      }
+    ],
+    "anthropic": [
+      {
+        "id": "claude-sonnet-4-20250514",
+        "envKey": "ANTHROPIC_API_KEY"
+      }
+    ]
+  },
+  "codingPlan": {
+    "region": "cn-hangzhou"
+  }
+}

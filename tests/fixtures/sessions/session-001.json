@@ -1,0 +1,11 @@
+{
+  "model": "anthropic/claude-sonnet-4-20250514",
+  "timestamp": "2026-04-08T14:30:22Z",
+  "usage": {
+    "input_tokens": 2100,
+    "output_tokens": 845,
+    "cache_write_tokens": 120,
+    "cache_hit_tokens": 380,
+    "cost_microdollars": 32000
+  }
+}

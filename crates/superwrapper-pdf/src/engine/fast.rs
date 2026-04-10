@@ -86,12 +86,15 @@ impl FastEngine {
         path: &Path,
         config: &ExtractionConfig,
     ) -> Result<ExtractionResult> {
-        let mut doc =
-            PdfDocument::open(path).map_err(|e| SuperWrapperError::PdfParse(e.to_string()))?;
+        let mut doc = PdfDocument::open(path).map_err(|e| SuperWrapperError::PdfParse {
+            path: Some(path.to_string_lossy().to_string()),
+            details: e.to_string(),
+        })?;
 
-        let page_count =
-            doc.page_count()
-                .map_err(|e| SuperWrapperError::PdfParse(e.to_string()))? as u32;
+        let page_count = doc.page_count().map_err(|e| SuperWrapperError::PdfParse {
+            path: Some(path.to_string_lossy().to_string()),
+            details: e.to_string(),
+        })? as u32;
 
         let page_range = config
             .page_range
@@ -102,9 +105,12 @@ impl FastEngine {
         let mut all_text = String::new();
 
         for page_num in page_range {
-            let text = doc
-                .extract_text(page_num as usize)
-                .map_err(|e| SuperWrapperError::PdfParse(e.to_string()))?;
+            let text =
+                doc.extract_text(page_num as usize)
+                    .map_err(|e| SuperWrapperError::PdfParse {
+                        path: Some(path.to_string_lossy().to_string()),
+                        details: e.to_string(),
+                    })?;
             all_text.push_str(&text);
             if page_num < page_count.saturating_sub(1) {
                 all_text.push_str("\n\n");
@@ -126,8 +132,13 @@ impl FastEngine {
     }
 
     fn extract_parallel(&self, path: &Path) -> Result<ExtractionResult> {
-        let texts = pdf_oxide::parallel::ParallelExtractor::extract_all_text(path)
-            .map_err(|e| SuperWrapperError::PdfParse(e.to_string()))?;
+        let texts =
+            pdf_oxide::parallel::ParallelExtractor::extract_all_text(path).map_err(|e| {
+                SuperWrapperError::PdfParse {
+                    path: Some(path.to_string_lossy().to_string()),
+                    details: e.to_string(),
+                }
+            })?;
 
         let page_count = texts.len() as u32;
         let all_text = texts.join("\n\n");

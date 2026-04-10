@@ -46,6 +46,7 @@ impl StructuredEngine {
                 return Err(SuperWrapperError::PageOutOfRange {
                     requested: page_num,
                     total: page_count,
+                    path: Some(path.to_string_lossy().to_string()),
                 });
             }
 

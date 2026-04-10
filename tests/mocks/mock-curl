@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# mock-curl - Mock curl for testing provider API verification
+#
+# Returns canned responses based on the URL being called.
+# Set MOCK_CURL_RESPONSE to override behavior:
+#   MOCK_CURL_RESPONSE=200  → always return success
+#   MOCK_CURL_RESPONSE=401  → always return unauthorized
+#   MOCK_CURL_RESPONSE=429  → always return rate limited
+#   MOCK_CURL_RESPONSE=fail → always fail connection
+
+set -euo pipefail
+
+MOCK_RESPONSE="${MOCK_CURL_RESPONSE:-200}"
+
+# Parse URL from arguments
+URL=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        http*) URL="$1"; break ;;
+    esac
+    shift
+done
+
+# Generate response based on URL
+case "$URL" in
+    *anthropic*)
+        if [ "$MOCK_RESPONSE" = "200" ]; then
+            echo '{"type":"message","content":[{"type":"text","text":"hello"}],"usage":{"input_tokens":10,"output_tokens":5}}'
+            echo "200"
+        elif [ "$MOCK_RESPONSE" = "401" ] || [ "$MOCK_RESPONSE" = "403" ]; then
+            echo '{"error":{"type":"authentication_error","message":"Invalid API key"}}'
+            echo "401"
+        elif [ "$MOCK_RESPONSE" = "429" ]; then
+            echo '{"error":{"type":"rate_limit_error","message":"Rate limited"}}'
+            echo "429"
+        else
+            echo '{"error":{"type":"api_error","message":"Internal error"}}'
+            echo "500"
+        fi
+        ;;
+    *openai*)
+        if [ "$MOCK_RESPONSE" = "200" ]; then
+            echo '{"data":[{"id":"gpt-4","object":"model"}],"object":"list"}'
+            echo "200"
+        elif [ "$MOCK_RESPONSE" = "401" ]; then
+            echo '{"error":{"message":"Invalid API key","type":"invalid_request_error"}}'
+            echo "401"
+        elif [ "$MOCK_RESPONSE" = "429" ]; then
+            echo '{"error":{"message":"Rate limit exceeded","type":"rate_limit_error"}}'
+            echo "429"
+        else
+            echo '{"error":{"message":"Internal error"}}'
+            echo "500"
+        fi
+        ;;
+    *google*|*generativelanguage*)
+        if [ "$MOCK_RESPONSE" = "200" ]; then
+            echo '{"models":[{"name":"models/gemini-2.5-pro"},{"name":"models/gemini-2.0-flash"}]}'
+            echo "200"
+        elif [ "$MOCK_RESPONSE" = "400" ] || [ "$MOCK_RESPONSE" = "401" ]; then
+            echo '{"error":{"code":400,"message":"API key not valid"}}'
+            echo "400"
+        else
+            echo '{"error":{"code":500,"message":"Internal error"}}'
+            echo "500"
+        fi
+        ;;
+    *groq*)
+        if [ "$MOCK_RESPONSE" = "200" ]; then
+            echo '{"data":[{"id":"llama-3.1-70b"},{"id":"mixtral-8x7b"}],"object":"list"}'
+            echo "200"
+        elif [ "$MOCK_RESPONSE" = "401" ]; then
+            echo '{"error":{"message":"Invalid API key"}}'
+            echo "401"
+        else
+            echo '{"error":{"message":"Internal error"}}'
+            echo "500"
+        fi
+        ;;
+    *openrouter*)
+        if [ "$MOCK_RESPONSE" = "200" ]; then
+            echo '{"data":{"label":"test-key","rate_limit":{"requests":1000}}}'
+            echo "200"
+        elif [ "$MOCK_RESPONSE" = "401" ]; then
+            echo '{"error":"Invalid API key"}'
+            echo "401"
+        else
+            echo '{"error":"Internal error"}'
+            echo "500"
+        fi
+        ;;
+    *balance*|*kilo.ai*)
+        if [ "$MOCK_RESPONSE" = "200" ]; then
+            echo '{"balance":{"credits":15.42,"used_credits":4.58,"total_credits":20.00,"currency":"USD"}}'
+            echo "200"
+        elif [ "$MOCK_RESPONSE" = "401" ]; then
+            echo '{"error":"Unauthorized"}'
+            echo "401"
+        elif [ "$MOCK_RESPONSE" = "402" ]; then
+            echo '{"error":"Payment required","buyCreditsUrl":"https://app.kilo.ai/billing"}'
+            echo "402"
+        elif [ "$MOCK_RESPONSE" = "429" ]; then
+            echo '{"error":"Rate limited"}'
+            echo "429"
+        else
+            echo '{"error":"Internal error"}'
+            echo "500"
+        fi
+        ;;
+    *)
+        echo '{}'
+        echo "200"
+        ;;
+esac

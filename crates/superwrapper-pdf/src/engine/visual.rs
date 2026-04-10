@@ -35,7 +35,10 @@ impl VisualEngine {
         let pdfium = Pdfium::default();
         let document = pdfium
             .load_pdf_from_file(path, config.password.as_deref())
-            .map_err(|e| SuperWrapperError::Pdfium(e.to_string()))?;
+            .map_err(|e| SuperWrapperError::Pdfium {
+                message: e.to_string(),
+                path: Some(path.to_string_lossy().to_string()),
+            })?;
 
         let page_count = document.pages().len() as u32;
 
@@ -56,14 +59,18 @@ impl VisualEngine {
                 return Err(SuperWrapperError::PageOutOfRange {
                     requested: page_num,
                     total: page_count,
+                    path: Some(path.to_string_lossy().to_string()),
                 });
             }
 
             let page = document.pages().get(page_index).unwrap();
 
-            let rendered = page
-                .render_with_config(&render_config)
-                .map_err(|e| SuperWrapperError::Pdfium(e.to_string()))?;
+            let rendered =
+                page.render_with_config(&render_config)
+                    .map_err(|e| SuperWrapperError::Pdfium {
+                        message: e.to_string(),
+                        path: Some(path.to_string_lossy().to_string()),
+                    })?;
 
             let image = rendered.as_image();
 
@@ -75,11 +82,17 @@ impl VisualEngine {
             let mut buffer = Vec::new();
             image
                 .write_to(&mut std::io::Cursor::new(&mut buffer), img_format)
-                .map_err(|e| SuperWrapperError::Pdfium(e.to_string()))?;
+                .map_err(|e| SuperWrapperError::Pdfium {
+                    message: e.to_string(),
+                    path: Some(path.to_string_lossy().to_string()),
+                })?;
 
             let text = page
                 .text()
-                .map_err(|e| SuperWrapperError::Pdfium(e.to_string()))?
+                .map_err(|e| SuperWrapperError::Pdfium {
+                    message: e.to_string(),
+                    path: Some(path.to_string_lossy().to_string()),
+                })?
                 .to_string();
 
             all_text.push_str(&text);

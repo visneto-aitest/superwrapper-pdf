@@ -63,31 +63,27 @@ pub struct PyExtractionConfig {
 #[pymethods]
 impl PyExtractionConfig {
     #[new]
-    #[pyo3(signature = (mode="fast", page_range=None, password=None, parallel=true))]
+    #[pyo3(signature = (mode="fast", page_range=None, password=None, parallel=true, dpi=150))]
     fn new(
         mode: Option<&str>,
         page_range: Option<(u32, u32)>,
         password: Option<String>,
         parallel: Option<bool>,
+        dpi: Option<u32>,
     ) -> PyResult<Self> {
         let mode_inner = match mode.unwrap_or("fast").to_lowercase().as_str() {
             "fast" => swp_pdf::ExtractionMode::Fast,
             "structured" => swp_pdf::ExtractionMode::Structured,
+            "visual" => swp_pdf::ExtractionMode::Visual {
+                dpi: dpi.unwrap_or(150),
+                format: swp_pdf::ImageFormat::Png,
+            },
             _ => {
                 return Err(PyRuntimeError::new_err(format!(
-                    "Unknown mode: {}",
+                    "Unknown mode: {}. Valid modes: fast, structured, visual",
                     mode.unwrap()
                 )))
             }
-        };
-
-        let page_range_inner = page_range.map(|(s, e)| s..=e);
-
-        let inner = swp_pdf::ExtractionConfig {
-            mode: mode_inner,
-            page_range: page_range_inner,
-            password,
-            parallel: parallel.unwrap_or(true),
         };
 
         let page_range_inner = page_range.map(|(s, e)| s..=e);
@@ -119,7 +115,7 @@ fn extract_pdf(path: String, config: Option<PyExtractionConfig>) -> PyResult<PyE
     let engine: Box<dyn swp_pdf::PdfEngine> = match config_inner.mode {
         swp_pdf::ExtractionMode::Fast => Box::new(swp_pdf::FastEngine),
         swp_pdf::ExtractionMode::Structured => Box::new(swp_pdf::StructuredEngine),
-        _ => return Err(PyRuntimeError::new_err("Visual mode not yet implemented")),
+        swp_pdf::ExtractionMode::Visual { .. } => Box::new(swp_pdf::VisualEngine),
     };
 
     let result = engine

@@ -1,0 +1,11 @@
+{
+  "model": "openai/gpt-4-turbo",
+  "timestamp": "2026-04-08T13:15:10Z",
+  "usage": {
+    "input_tokens": 5800,
+    "output_tokens": 1200,
+    "cache_write_tokens": 0,
+    "cache_hit_tokens": 0,
+    "cost_microdollars": 120000
+  }
+}

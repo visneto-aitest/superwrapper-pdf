@@ -18,13 +18,13 @@
 //!     Ok(result) => {
 //!         println!("Extracted {} pages", result.page_count);
 //!     }
-//!     Err(SuperWrapperError::Io(e)) => {
-//!         eprintln!("File access error: {}", e);
+//!     Err(SuperWrapperError::Io { source, .. }) => {
+//!         eprintln!("File access error: {}", source);
 //!     }
-//!     Err(SuperWrapperError::Encrypted) => {
+//!     Err(SuperWrapperError::Encrypted { .. }) => {
 //!         eprintln!("PDF is password-protected");
 //!     }
-//!     Err(SuperWrapperError::PageOutOfRange { requested, total }) => {
+//!     Err(SuperWrapperError::PageOutOfRange { requested, total, .. }) => {
 //!         eprintln!("Requested page {} but PDF has {} pages", requested, total);
 //!     }
 //!     Err(e) => {
@@ -35,6 +35,7 @@
 //! # }
 //! ```
 
+use std::path::Path;
 use thiserror::Error;
 
 /// Comprehensive error type for PDF extraction operations
@@ -42,32 +43,67 @@ use thiserror::Error;
 /// Each variant represents a distinct category of failure that can occur
 /// during PDF extraction. The error types are feature-gated - some variants
 /// only exist when specific extraction engines are enabled.
+///
+/// # Context Enhancement
+///
+/// All errors include contextual information when available. Use the
+/// [`SuperWrapperError::context()`] method to add file path context to errors.
+/// Use [`SuperWrapperError::path()`] to retrieve the path from an error.
 #[derive(Error, Debug)]
 pub enum SuperWrapperError {
     /// File system access errors (permission denied, file not found, etc.)
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("IO error: {source}")]
+    Io {
+        /// The file path that was being accessed
+        #[doc(hidden)]
+        path: Option<String>,
+        /// The underlying IO error
+        source: std::io::Error,
+    },
 
     /// PDF parsing errors (corrupted file, invalid format, etc.)
-    #[error("PDF parsing error: {0}")]
-    PdfParse(String),
+    #[error("PDF parsing error: {details}")]
+    PdfParse {
+        /// The file path that was being parsed
+        #[doc(hidden)]
+        path: Option<String>,
+        /// Details about what went wrong
+        details: String,
+    },
 
     /// Document is encrypted and requires a password
     /// Returned when no password is provided or the password is incorrect
-    #[error("Encrypted PDF (no password provided or invalid)")]
-    Encrypted,
+    #[error("Encrypted PDF (password required)")]
+    Encrypted {
+        /// The file path of the encrypted document
+        #[doc(hidden)]
+        path: Option<String>,
+    },
 
     /// Requested page number exceeds document length
     /// Fields indicate which page was requested and total pages available
-    #[error("Page {requested} out of range (total: {total})")]
-    PageOutOfRange { requested: u32, total: u32 },
+    #[error("Page {requested} out of range (document has {total} pages)")]
+    PageOutOfRange {
+        /// The page number that was requested
+        requested: u32,
+        /// Total number of pages in the document
+        total: u32,
+        /// The file path (if available)
+        #[doc(hidden)]
+        path: Option<String>,
+    },
 
     /// Feature-gated extraction mode is not enabled
     /// Enable the appropriate feature in Cargo.toml: `structured`, `visual`, etc.
     #[error(
-        "Extraction mode '{mode}' is not enabled. Build with feature '{feature}' to enable it."
+        "Extraction mode '{mode}' is not enabled. Add feature '{feature}' to Cargo.toml to enable."
     )]
-    FeatureNotEnabled { mode: String, feature: String },
+    FeatureNotEnabled {
+        /// The mode that was requested
+        mode: String,
+        /// The feature that needs to be enabled
+        feature: String,
+    },
 
     /// Errors from pdf_oxide library (FastEngine failures)
     #[error("pdf_oxide error: {0}")]
@@ -82,12 +118,93 @@ pub enum SuperWrapperError {
     /// Errors from pdfium-render library (VisualEngine failures)
     /// Only available when `visual` feature is enabled
     #[cfg(feature = "visual")]
-    #[error("pdfium-render error: {0}")]
-    Pdfium(String),
+    #[error("pdfium-render error: {message}")]
+    Pdfium {
+        /// The underlying error message
+        message: String,
+        /// The file path (if available)
+        #[doc(hidden)]
+        path: Option<String>,
+    },
+}
+
+impl From<std::io::Error> for SuperWrapperError {
+    fn from(err: std::io::Error) -> Self {
+        SuperWrapperError::Io {
+            path: None,
+            source: err,
+        }
+    }
+}
+
+impl SuperWrapperError {
+    /// Add file path context to an error
+    ///
+    /// This method enriches an error with the file path where the operation
+    /// failed, making debugging easier.
+    pub fn context(mut self, path: &Path) -> Self {
+        let path_str = path.to_string_lossy().to_string();
+        match &mut self {
+            SuperWrapperError::Io { path: p, .. } => *p = Some(path_str),
+            SuperWrapperError::PdfParse { path: p, .. } => *p = Some(path_str),
+            SuperWrapperError::Encrypted { path: p } => *p = Some(path_str),
+            SuperWrapperError::PageOutOfRange { path: p, .. } => *p = Some(path_str),
+            SuperWrapperError::Pdfium { path: p, .. } => *p = Some(path_str),
+            _ => {}
+        }
+        self
+    }
+
+    /// Get the file path from an error, if available
+    pub fn path(&self) -> Option<&str> {
+        match self {
+            SuperWrapperError::Io { path, .. } => path.as_deref(),
+            SuperWrapperError::PdfParse { path, .. } => path.as_deref(),
+            SuperWrapperError::Encrypted { path } => path.as_deref(),
+            SuperWrapperError::PageOutOfRange { path, .. } => path.as_deref(),
+            SuperWrapperError::Pdfium { path, .. } => path.as_deref(),
+            _ => None,
+        }
+    }
 }
 
 /// Type alias for results using SuperWrapperError
-///
-/// Provides a convenient shorthand for functions that return extraction results.
-/// Instead of writing `Result<T, SuperWrapperError>`, you can write `Result<T>`.
 pub type Result<T> = std::result::Result<T, SuperWrapperError>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_context_io() {
+        let error = SuperWrapperError::Io {
+            path: None,
+            source: std::io::Error::new(std::io::ErrorKind::NotFound, "file not found"),
+        };
+
+        let enriched = error.context(std::path::Path::new("/test/doc.pdf"));
+        assert_eq!(enriched.path(), Some("/test/doc.pdf"));
+    }
+
+    #[test]
+    fn test_error_context_pdf_parse() {
+        let error = SuperWrapperError::PdfParse {
+            path: None,
+            details: "Invalid structure".to_string(),
+        };
+
+        let enriched = error.context(std::path::Path::new("/test/doc.pdf"));
+        assert_eq!(enriched.path(), Some("/test/doc.pdf"));
+    }
+
+    #[test]
+    fn test_error_display_with_path() {
+        let error = SuperWrapperError::PdfParse {
+            path: Some("/path/to/file.pdf".to_string()),
+            details: "Invalid PDF header".to_string(),
+        };
+
+        let display = format!("{}", error);
+        assert!(display.contains("Invalid PDF header"));
+    }
+}

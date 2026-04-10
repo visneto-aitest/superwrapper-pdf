@@ -14,4 +14,4 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 pyo3 = { version = "0.28", features = ["extension-module"] }
-superwrapper-pdf = { path = "../../crates/superwrapper-pdf", default-features = false, features = ["structured"] }
+superwrapper-pdf = { path = "../../crates/superwrapper-pdf", default-features = false, features = ["structured", "visual"] }

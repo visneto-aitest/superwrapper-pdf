@@ -1,0 +1,10 @@
+{
+  "model": "gemini-2.5-pro",
+  "theme": "default",
+  "autoAccept": false,
+  "checkpointing": true,
+  "generationConfig": {
+    "temperature": 0.7,
+    "maxOutputTokens": 8192
+  }
+}

@@ -55,12 +55,12 @@ _dry_run() {
 
 # Parse modelProviders from settings.json
 _parse_model_providers() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         python3 -c "
-import json
+import json, sys
 try:
-    cfg = json.load(open('$file'))
+    cfg = json.load(open(sys.argv[1]))
     mp = cfg.get('modelProviders', {})
     providers = []
     for auth_type, models in mp.items():
@@ -74,7 +74,7 @@ try:
         print('(no providers configured)')
 except:
     print('(parse error)')
-" 2>/dev/null || echo "(parse error)"
+" "$file" 2>/dev/null || echo "(parse error)"
     else
         echo "(no parser available)"
     fi
@@ -82,17 +82,17 @@ except:
 
 # Parse codingPlan region
 _parse_region() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         python3 -c "
-import json
+import json, sys
 try:
-    cfg = json.load(open('$file'))
+    cfg = json.load(open(sys.argv[1]))
     region = cfg.get('codingPlan', {}).get('region', 'default')
     print(region)
 except:
     print('unknown')
-" 2>/dev/null || echo "unknown"
+" "$file" 2>/dev/null || echo "unknown"
     else
         echo "unknown"
     fi

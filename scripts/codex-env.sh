@@ -278,6 +278,22 @@ create_account() {
 # ─── GitHub (for MCP) ────────────────────────────────────────────
 # GITHUB_TOKEN=ghp_your-token
 
+# ─── OAuth Token (headless/non-interactive - limited support) ────
+# Codex CLI currently requires interactive OAuth via localhost:1455
+# For headless usage, use OPENAI_API_KEY instead (recommended)
+#
+# Workarounds for OAuth on remote machines:
+# 1. SSH Port Forwarding:
+#    ssh -L 1455:localhost:1455 user@remote
+#    Then run: codex login (on remote machine)
+#
+# 2. Copy auth.json from interactive machine:
+#    scp ~/.codex/auth.json user@remote:~/.codex/auth.json
+#
+# Future: When Codex supports manual OAuth tokens or device code flow:
+# CODEX_OAUTH_TOKEN=your-oauth-token-here
+# CODEX_AUTH_FILE=/path/to/custom/auth.json
+
 # ─── Configuration ────────────────────────────────────────────────
 # CODEX_MODEL=gpt-5.4
 # CODEX_PROVIDER=openai

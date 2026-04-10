@@ -57,12 +57,12 @@ _dry_run() {
 
 # Parse model from settings.json
 _parse_model() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         python3 -c "
-import json, os
+import json, os, sys
 try:
-    cfg = json.load(open('$file'))
+    cfg = json.load(open(sys.argv[1]))
     # Claude Code settings.json doesn't have a 'model' key directly;
     # it stores env vars under 'env' key
     env = cfg.get('env', {})
@@ -70,7 +70,7 @@ try:
     print(model)
 except:
     print('(parse error)')
-" 2>/dev/null || echo "(parse error)"
+" "$file" 2>/dev/null || echo "(parse error)"
     else
         echo "(no parser available)"
     fi
@@ -78,12 +78,12 @@ except:
 
 # Parse provider mode from settings.json
 _parse_provider() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         python3 -c "
-import json
+import json, sys
 try:
-    cfg = json.load(open('$file'))
+    cfg = json.load(open(sys.argv[1]))
     env = cfg.get('env', {})
     if env.get('CLAUDE_CODE_USE_BEDROCK') == '1':
         print(f\"bedrock ({env.get('AWS_REGION', 'unknown')})\")
@@ -97,7 +97,7 @@ try:
         print('subscription (OAuth)')
 except:
     print('unknown')
-" 2>/dev/null || echo "unknown"
+" "$file" 2>/dev/null || echo "unknown"
     else
         echo "unknown"
     fi

@@ -193,3 +193,258 @@ _validate_name() {
     fi
     return 0
 }
+
+# ─── OAuth Token Helpers ──────────────────────────────────────────────────────
+
+# Import OAuth token to CLI auth storage
+# Usage: _import_oauth_token "claude" "your-token-here"
+# Supported tools: claude, opencode, gemini, kilo, codex
+_import_oauth_token() {
+    local tool="$1"
+    local token="$2"
+    
+    if [ -z "$tool" ] || [ -z "$token" ]; then
+        printf '❌ Error: Tool name and token required.\n'
+        printf 'Usage: _import_oauth_token <tool> <token>\n'
+        printf 'Supported tools: claude, opencode, gemini, kilo, codex\n'
+        return 1
+    fi
+    
+    case "$tool" in
+        claude)
+            local auth_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
+            local auth_file="$auth_dir/.credentials.json"
+            mkdir -p "$auth_dir"
+            printf '{"claudeAiOauth":{"type":"oauth","access":"%s","refresh":"","expires":0}}' "$token" > "$auth_file"
+            chmod 600 "$auth_file"
+            printf '✅ OAuth token imported to: %s\n' "$auth_file"
+            ;;
+        opencode)
+            local auth_file="$HOME/.local/share/opencode/auth.json"
+            mkdir -p "$(dirname "$auth_file")"
+            printf '{"provider":{"type":"oauth","access":"%s","refresh":"","expires":0}}' "$token" > "$auth_file"
+            chmod 600 "$auth_file"
+            printf '✅ OAuth token imported to: %s\n' "$auth_file"
+            ;;
+        gemini)
+            local auth_file="$HOME/.gemini/credentials.json"
+            mkdir -p "$(dirname "$auth_file")"
+            printf '{"type":"oauth","access_token":"%s","refresh_token":"","expires_in":3600}' "$token" > "$auth_file"
+            chmod 600 "$auth_file"
+            printf '✅ OAuth token imported to: %s\n' "$auth_file"
+            ;;
+        kilo)
+            local auth_file="$HOME/.local/share/kilo/auth.json"
+            mkdir -p "$(dirname "$auth_file")"
+            printf '{"kilo":{"type":"oauth","access":"%s","refresh":"","expires":0}}' "$token" > "$auth_file"
+            chmod 600 "$auth_file"
+            printf '✅ OAuth token imported to: %s\n' "$auth_file"
+            ;;
+        codex)
+            local auth_file="$HOME/.codex/auth.json"
+            mkdir -p "$(dirname "$auth_file")"
+            printf '{"type":"oauth","access_token":"%s","refresh_token":"","expires_in":3600}' "$token" > "$auth_file"
+            chmod 600 "$auth_file"
+            printf '✅ OAuth token imported to: %s\n' "$auth_file"
+            printf '⚠ Note: Codex OAuth support is limited. OPENAI_API_KEY is recommended for headless usage.\n'
+            ;;
+        *)
+            printf '❌ Error: Unsupported tool: %s\n' "$tool"
+            printf 'Supported tools: claude, opencode, gemini, kilo, codex\n'
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+# Export OAuth token from CLI auth storage
+# Usage: _export_oauth_token "claude"
+# Returns token on stdout, or error message on stderr
+_export_oauth_token() {
+    local tool="$1"
+    
+    if [ -z "$tool" ]; then
+        printf '❌ Error: Tool name required.\n' >&2
+        printf 'Usage: _export_oauth_token <tool>\n' >&2
+        return 1
+    fi
+    
+    case "$tool" in
+        claude)
+            local auth_file="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
+            if [ ! -f "$auth_file" ]; then
+                printf '❌ Error: No credentials found at %s\n' "$auth_file" >&2
+                return 1
+            fi
+            python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["claudeAiOauth"]["access"])' "$auth_file" 2>/dev/null || \
+                { printf '❌ Error: Failed to parse credentials\n' >&2; return 1; }
+            ;;
+        opencode)
+            local auth_file="$HOME/.local/share/opencode/auth.json"
+            if [ ! -f "$auth_file" ]; then
+                printf '❌ Error: No credentials found at %s\n' "$auth_file" >&2
+                return 1
+            fi
+            python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); print(data.get("provider",{}).get("access",""))' "$auth_file" 2>/dev/null || \
+                { printf '❌ Error: Failed to parse credentials\n' >&2; return 1; }
+            ;;
+        gemini)
+            local auth_file="$HOME/.gemini/credentials.json"
+            if [ ! -f "$auth_file" ]; then
+                printf '❌ Error: No credentials found at %s\n' "$auth_file" >&2
+                return 1
+            fi
+            python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("access_token",""))' "$auth_file" 2>/dev/null || \
+                { printf '❌ Error: Failed to parse credentials\n' >&2; return 1; }
+            ;;
+        kilo)
+            local auth_file="${KILO_AUTH_FILE:-$HOME/.local/share/kilo/auth.json}"
+            if [ ! -f "$auth_file" ]; then
+                printf '❌ Error: No credentials found at %s\n' "$auth_file" >&2
+                return 1
+            fi
+            python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); print(list(data.values())[0].get("access",""))' "$auth_file" 2>/dev/null || \
+                { printf '❌ Error: Failed to parse credentials\n' >&2; return 1; }
+            ;;
+        codex)
+            local auth_file="$HOME/.codex/auth.json"
+            if [ ! -f "$auth_file" ]; then
+                printf '❌ Error: No credentials found at %s\n' "$auth_file" >&2
+                return 1
+            fi
+            python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("access_token",""))' "$auth_file" 2>/dev/null || \
+                { printf '❌ Error: Failed to parse credentials\n' >&2; return 1; }
+            ;;
+        *)
+            printf '❌ Error: Unsupported tool: %s\n' "$tool" >&2
+            printf 'Supported tools: claude, opencode, gemini, kilo, codex\n' >&2
+            return 1
+            ;;
+    esac
+    return 0
+}
+
+# Check OAuth token status for a tool
+# Usage: _check_oauth_status "claude"
+_check_oauth_status() {
+    local tool="$1"
+    
+    case "$tool" in
+        claude)
+            local auth_file="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json"
+            ;;
+        opencode)
+            local auth_file="$HOME/.local/share/opencode/auth.json"
+            ;;
+        gemini)
+            local auth_file="$HOME/.gemini/credentials.json"
+            ;;
+        kilo)
+            local auth_file="${KILO_AUTH_FILE:-$HOME/.local/share/kilo/auth.json}"
+            ;;
+        codex)
+            local auth_file="$HOME/.codex/auth.json"
+            ;;
+        *)
+            printf '❓ OAuth status: Unknown tool "%s"\n' "$tool"
+            return 1
+            ;;
+    esac
+    
+    if [ ! -f "$auth_file" ]; then
+        printf '❓ OAuth status: No credentials found for %s\n' "$tool"
+        return 1
+    fi
+    
+    local has_token
+    has_token=$(python3 -c '
+import json, sys
+try:
+    data = json.load(open(sys.argv[1]))
+    # Try different key structures
+    for key in data:
+        entry = data[key]
+        if isinstance(entry, dict):
+            if entry.get("type") == "oauth":
+                token = entry.get("access") or entry.get("access_token", "")
+                if token:
+                    print("active")
+                    sys.exit(0)
+    print("inactive")
+except Exception:
+    print("error")
+' "$auth_file" 2>/dev/null || echo "error")
+    
+    case "$has_token" in
+        active)
+            printf '✅ OAuth status: %s has active OAuth credentials\n' "$tool"
+            return 0
+            ;;
+        inactive)
+            printf '❓ OAuth status: %s credentials found but no valid token\n' "$tool"
+            return 1
+            ;;
+        error)
+            printf '❓ OAuth status: Unable to parse credentials for %s\n' "$tool"
+            return 1
+            ;;
+    esac
+}
+
+# Copy OAuth credentials from one machine to another (via file)
+# Usage: _copy_oauth_credentials "source_machine:path" "claude" "dest_path"
+_copy_oauth_credentials() {
+    local source="$1"
+    local tool="$2"
+    local dest="${3:-}"
+    
+    if [ -z "$source" ] || [ -z "$tool" ]; then
+        printf '❌ Error: Source path and tool name required.\n'
+        printf 'Usage: _copy_oauth_credentials <source_path> <tool> [dest_path]\n'
+        return 1
+    fi
+    
+    if [ ! -f "$source" ]; then
+        printf '❌ Error: Source file not found: %s\n' "$source"
+        return 1
+    fi
+    
+    # Determine destination path
+    case "$tool" in
+        claude)
+            dest="${dest:-${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json}"
+            ;;
+        opencode)
+            dest="${dest:-$HOME/.local/share/opencode/auth.json}"
+            ;;
+        gemini)
+            dest="${dest:-$HOME/.gemini/credentials.json}"
+            ;;
+        kilo)
+            dest="${dest:-$HOME/.local/share/kilo/auth.json}"
+            ;;
+        codex)
+            dest="${dest:-$HOME/.codex/auth.json}"
+            ;;
+        *)
+            printf '❌ Error: Unsupported tool: %s\n' "$tool"
+            return 1
+            ;;
+    esac
+    
+    # Validate source is valid JSON
+    if ! _validate_json "$source"; then
+        printf '❌ Error: Source file is not valid JSON\n'
+        return 1
+    fi
+    
+    # Copy credentials
+    mkdir -p "$(dirname "$dest")"
+    cp "$source" "$dest"
+    chmod 600 "$dest"
+    
+    printf '✅ OAuth credentials copied to: %s\n' "$dest"
+    printf '⚠ Ensure this matches the source machine credentials\n'
+    return 0
+}
+

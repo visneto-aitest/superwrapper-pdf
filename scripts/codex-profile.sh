@@ -30,7 +30,7 @@ _get_editor() {
 }
 
 _validate_toml() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         if ! python3 -c 'import toml; toml.load(open(sys.argv[1]))' "$file" 2>/dev/null; then
             return 1
@@ -75,17 +75,17 @@ _backup_auth() {
 }
 
 _parse_model() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         python3 -c "
-import toml
+import sys, toml
 try:
-    cfg = toml.load(open('$file'))
+    cfg = toml.load(open(sys.argv[1]))
     model = cfg.get('model', 'not set')
     print(model)
 except Exception as e:
     print(f'(parse error: {e})')
-" 2>/dev/null || echo "(parse error)"
+" "$file" 2>/dev/null || echo "(parse error)"
     else
         grep -E '^model\s*=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- | tr -d ' "'
     fi

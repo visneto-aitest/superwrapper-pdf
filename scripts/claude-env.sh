@@ -29,6 +29,7 @@ CLAUDE_ACCOUNTS_DIR="${CLAUDE_ACCOUNTS_DIR:-${HOME}/.config/claude/accounts}"
 CLAUDE_PROVIDER_VARS=(
     "ANTHROPIC_API_KEY"
     "ANTHROPIC_AUTH_TOKEN"
+    "CLAUDE_CODE_OAUTH_TOKEN"
     "ANTHROPIC_MODEL"
     "CLAUDE_CODE_SUBAGENT_MODEL"
     "CLAUDE_CODE_MAX_OUTPUT_TOKENS"
@@ -61,6 +62,7 @@ CLAUDE_PROVIDER_VARS=(
 CLAUDE_SECRET_VARS=(
     "ANTHROPIC_API_KEY"
     "ANTHROPIC_AUTH_TOKEN"
+    "CLAUDE_CODE_OAUTH_TOKEN"
     "AWS_ACCESS_KEY_ID"
     "AWS_SECRET_ACCESS_KEY"
     "CLAUDE_CODE_CLIENT_CERT"
@@ -172,6 +174,7 @@ Examples:
 Environment Variables (supported in account files):
   ANTHROPIC_API_KEY       Anthropic API key (direct billing)
   ANTHROPIC_MODEL         Override model (e.g., claude-sonnet-4-20250514)
+  CLAUDE_CODE_OAUTH_TOKEN Long-lived OAuth token (1-year, for headless/CI)
   CLAUDE_CODE_USE_BEDROCK=1     Use AWS Bedrock
   AWS_ACCESS_KEY_ID             AWS access key
   AWS_SECRET_ACCESS_KEY         AWS secret key
@@ -252,6 +255,8 @@ list_accounts() {
         foundry_val=$(grep -E '^CLAUDE_CODE_USE_FOUNDRY=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- || echo "")
         local api_key_val
         api_key_val=$(grep -E '^ANTHROPIC_API_KEY=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- || echo "")
+        local oauth_token_val
+        oauth_token_val=$(grep -E '^CLAUDE_CODE_OAUTH_TOKEN=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- || echo "")
 
         if [ "$bedrock_val" = "1" ]; then
             local region
@@ -263,6 +268,8 @@ list_accounts() {
             provider_mode="vertex/$project"
         elif [ "$foundry_val" = "1" ]; then
             provider_mode="foundry"
+        elif [ -n "$oauth_token_val" ]; then
+            provider_mode="oauth/headless"
         elif [ -n "$api_key_val" ]; then
             local model
             model=$(grep -E '^ANTHROPIC_MODEL=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- || echo "")
@@ -319,7 +326,16 @@ create_account() {
 # ANTHROPIC_API_KEY=sk-ant-your-key-here
 # ANTHROPIC_MODEL=claude-sonnet-4-20250514
 
-# ─── Option 2: AWS Bedrock ────────────────────────────────────
+# ─── Option 2: OAuth Token (headless/CI/CD - 1-year validity) ─
+# Generate with: claude setup-token
+# Then paste the output token here
+# CLAUDE_CODE_OAUTH_TOKEN=your-oauth-token-here
+#
+# Note: Requires Pro, Max, Team, or Enterprise subscription
+# Scoped to inference only (no Remote Control sessions)
+# Ignored when running Claude Code in --bare mode
+
+# ─── Option 3: AWS Bedrock ────────────────────────────────────
 # CLAUDE_CODE_USE_BEDROCK=1
 # AWS_ACCESS_KEY_ID=AKIA...
 # AWS_SECRET_ACCESS_KEY=...
@@ -327,12 +343,12 @@ create_account() {
 # CLOUD_ML_REGION=us-east-1
 # CLAUDE_CODE_SKIP_BEDROCK_AUTH=1
 
-# ─── Option 3: Google Vertex AI ───────────────────────────────
+# ─── Option 4: Google Vertex AI ───────────────────────────────
 # CLAUDE_CODE_USE_VERTEX=1
 # GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 # CLOUD_ML_REGION=us-central1
 
-# ─── Option 4: Microsoft Foundry ──────────────────────────────
+# ─── Option 5: Microsoft Foundry ──────────────────────────────
 # CLAUDE_CODE_USE_FOUNDRY=1
 # (Uses Azure/Entra ID authentication)
 
@@ -380,11 +396,12 @@ show_account() {
     echo "---"
 
     # Determine provider mode
-    local bedrock_val vertex_val foundry_val api_key_val
+    local bedrock_val vertex_val foundry_val api_key_val oauth_token_val
     bedrock_val=$(grep -E '^CLAUDE_CODE_USE_BEDROCK=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- || echo "")
     vertex_val=$(grep -E '^CLAUDE_CODE_USE_VERTEX=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- || echo "")
     foundry_val=$(grep -E '^CLAUDE_CODE_USE_FOUNDRY=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- || echo "")
     api_key_val=$(grep -E '^ANTHROPIC_API_KEY=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- || echo "")
+    oauth_token_val=$(grep -E '^CLAUDE_CODE_OAUTH_TOKEN=' "$file" 2>/dev/null | head -1 | cut -d'=' -f2- || echo "")
 
     if [ "$bedrock_val" = "1" ]; then
         echo "  Provider: AWS Bedrock"
@@ -392,6 +409,8 @@ show_account() {
         echo "  Provider: Google Vertex AI"
     elif [ "$foundry_val" = "1" ]; then
         echo "  Provider: Microsoft Foundry"
+    elif [ -n "$oauth_token_val" ]; then
+        echo "  Provider: OAuth Token (headless/CI)"
     elif [ -n "$api_key_val" ]; then
         echo "  Provider: Anthropic (direct API)"
     else
@@ -515,12 +534,20 @@ load_account() {
         echo "  Provider: Google Vertex AI (${GOOGLE_CLOUD_PROJECT:-unknown})"
     elif [ "${CLAUDE_CODE_USE_FOUNDRY:-}" = "1" ]; then
         echo "  Provider: Microsoft Foundry"
+    elif [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        echo "  Provider: OAuth Token (headless)"
     elif [ -n "${ANTHROPIC_API_KEY:-}" ]; then
         echo "  Provider: Anthropic (direct API)"
     fi
 
     if [ -n "${ANTHROPIC_MODEL:-}" ]; then
         echo "  Model: $ANTHROPIC_MODEL"
+    fi
+
+    # Check OAuth token status
+    if [ -n "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+        local token_len=${#CLAUDE_CODE_OAUTH_TOKEN}
+        echo "  OAuth Token: $(_mask_value "$CLAUDE_CODE_OAUTH_TOKEN")"
     fi
 
     if [ -n "${CLAUDE_CONFIG_DIR:-}" ]; then

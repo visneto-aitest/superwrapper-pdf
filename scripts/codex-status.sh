@@ -52,7 +52,7 @@ check_auth() {
         auth_type=$(python3 -c "
 import json, sys
 try:
-    data = json.load(open('$CODEX_AUTH'))
+    data = json.load(open(sys.argv[1]))
     if 'access_token' in data:
         print('token')
     elif 'api_key' in data:
@@ -63,7 +63,7 @@ try:
         print('unknown')
 except:
     print('error')
-" 2>/dev/null || echo "unknown")
+" "$CODEX_AUTH" 2>/dev/null || echo "unknown")
 
         case "$auth_type" in
             token) echo "  ✅ Auth type: ChatGPT token" ;;
@@ -76,7 +76,7 @@ except:
         expires=$(python3 -c "
 import json, sys
 try:
-    data = json.load(open('$CODEX_AUTH'))
+    data = json.load(open(sys.argv[1]))
     exp = data.get('expires_at', data.get('expires', 0))
     if exp:
         from datetime import datetime
@@ -86,7 +86,7 @@ try:
         print('never')
 except:
     print('unknown')
-" 2>/dev/null || echo "unknown")
+" "$CODEX_AUTH" 2>/dev/null || echo "unknown")
 
         if [ "$expires" != "never" ] && [ "$expires" != "unknown" ]; then
             echo "  Expires: $expires"
@@ -174,21 +174,23 @@ show_config() {
 
 output_json() {
     python3 -c "
-import json, os
+import json, os, sys
+
+codex_auth = sys.argv[1]
+codex_config = sys.argv[2]
 
 result = {
     'home': os.environ.get('CODEX_HOME', '$CODEX_HOME'),
-    'config_file': '$CODEX_CONFIG',
-    'auth_file': '$CODEX_AUTH',
+    'config_file': codex_config,
+    'auth_file': codex_auth,
     'auth_mode': 'unknown'
 }
 
 # Check auth mode
-if os.path.exists('$CODEX_AUTH'):
+if os.path.exists(codex_auth):
     result['auth_file_exists'] = True
     try:
-        import json
-        data = json.load(open('$CODEX_AUTH'))
+        data = json.load(open(codex_auth))
         if 'access_token' in data:
             result['auth_mode'] = 'chatgpt_token'
         elif 'api_key' in data:
@@ -207,11 +209,11 @@ else:
     result['has_openai_key'] = False
 
 # Check config
-if os.path.exists('$CODEX_CONFIG'):
+if os.path.exists(codex_config):
     result['config_exists'] = True
     try:
         import toml
-        cfg = toml.load(open('$CODEX_CONFIG'))
+        cfg = toml.load(open(codex_config))
         result['model'] = cfg.get('model', 'default')
         result['sandbox_mode'] = cfg.get('sandbox_mode', 'read-only')
     except:
@@ -220,7 +222,7 @@ else:
     result['config_exists'] = False
 
 print(json.dumps(result, indent=2))
-" 2>/dev/null || echo '{"error": "Unable to generate JSON"}'
+" "$CODEX_AUTH" "$CODEX_CONFIG" 2>/dev/null || echo '{"error": "Unable to generate JSON"}'
 }
 
 show_full_status() {

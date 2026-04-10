@@ -120,9 +120,9 @@ check_providers() {
         # Check for OAuth tokens
         local has_oauth
         has_oauth=$(python3 -c "
-import json
+import json, sys
 try:
-    data = json.load(open('$CLAUDE_STATE_FILE'))
+    data = json.load(open(sys.argv[1]))
     for key in data:
         if 'token' in key.lower() or 'auth' in key.lower() or 'oauth' in key.lower():
             print('yes')
@@ -131,7 +131,7 @@ try:
         print('no')
 except:
     print('no')
-" 2>/dev/null || echo "no")
+" "$CLAUDE_STATE_FILE" 2>/dev/null || echo "no")
         if [ "$has_oauth" = "yes" ]; then
             echo "  OAuth tokens: present ✅"
         else

@@ -95,7 +95,7 @@ check_providers() {
 import json, os, re, sys
 
 try:
-    cfg = json.load(open('$QWEN_SETTINGS'))
+    cfg = json.load(open(sys.argv[1]))
     mp = cfg.get('modelProviders', {})
     region = cfg.get('codingPlan', {}).get('region', 'default')
 
@@ -132,7 +132,7 @@ try:
 except Exception as e:
     print(f'  ❌ Error parsing settings.json: {e}')
     sys.exit(1)
-" 2>/dev/null
+" "$QWEN_SETTINGS" 2>/dev/null
 }
 
 # ─── Verify Provider ─────────────────────────────────────────────────────────
@@ -143,12 +143,13 @@ verify_provider() {
 
     if [ -z "$api_key" ]; then
         api_key=$(python3 -c "
-import json, os
+import json, os, sys
 try:
-    cfg = json.load(open('$QWEN_SETTINGS'))
+    cfg = json.load(open(sys.argv[1]))
     mp = cfg.get('modelProviders', {})
-    if '$provider' in mp:
-        for m in mp['$provider']:
+    provider = sys.argv[2]
+    if provider in mp:
+        for m in mp[provider]:
             env_key = m.get('envKey', '')
             if env_key:
                 val = os.environ.get(env_key, '')
@@ -157,7 +158,7 @@ try:
                     break
 except:
     pass
-" 2>/dev/null)
+" "$QWEN_SETTINGS" "$provider" 2>/dev/null)
     fi
 
     if [ -z "$api_key" ]; then
@@ -313,14 +314,14 @@ show_rate_limits() {
 
 output_json() {
     python3 -c "
-import json, os, glob
+import json, os, glob, sys
 result = {
-    'settings_file': '$QWEN_SETTINGS',
+    'settings_file': sys.argv[1],
     'providers': {},
     'session_summary': {}
 }
 try:
-    cfg = json.load(open('$QWEN_SETTINGS'))
+    cfg = json.load(open(sys.argv[1]))
     mp = cfg.get('modelProviders', {})
     for auth_type, models in mp.items():
         if isinstance(models, list):
@@ -330,7 +331,7 @@ try:
             ]
 except: pass
 try:
-    sd = '$QWEN_SESSION_DIR'
+    sd = sys.argv[2]
     if os.path.isdir(sd):
         sessions = glob.glob(os.path.join(sd, '*.json'))
         ti = to = tc = sc = 0
@@ -343,7 +344,7 @@ try:
         result['session_summary'] = {'sessions_analyzed': sc, 'total_input_tokens': ti, 'total_output_tokens': to, 'estimated_cost_usd': round(tc/1000000, 4) if tc >= 1000 else round(tc, 4)}
 except: pass
 print(json.dumps(result, indent=2))
-" 2>/dev/null || echo '{"error": "Unable to generate JSON"}'
+" "$QWEN_SETTINGS" "$QWEN_SESSION_DIR" 2>/dev/null || echo '{"error": "Unable to generate JSON"}'
 }
 
 # ─── Full Status ──────────────────────────────────────────────────────────────
@@ -358,7 +359,7 @@ show_full_status() {
     echo "  Settings: $QWEN_SETTINGS"
     if [ -f "$QWEN_SETTINGS" ]; then
         local region
-        region=$(python3 -c "import json; print(json.load(open('$QWEN_SETTINGS')).get('codingPlan',{}).get('region','default'))" 2>/dev/null || echo "unknown")
+        region=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('codingPlan',{}).get('region','default'))" "$QWEN_SETTINGS" 2>/dev/null || echo "unknown")
         echo "  Region:   $region"
     else
         echo "  ⚠ Not found"

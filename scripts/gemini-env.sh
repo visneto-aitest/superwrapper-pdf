@@ -45,6 +45,8 @@ GEMINI_PROVIDER_VARS=(
     "GEMINI_API_KEY"
     "GOOGLE_CLOUD_PROJECT"
     "GOOGLE_APPLICATION_CREDENTIALS"
+    "GEMINI_OAUTH_TOKEN"
+    "GEMINI_REFRESH_TOKEN"
     "GEMINI_MODEL"
     "GEMINI_REGION"
     "GEMINI_TEMPERATURE"
@@ -57,6 +59,8 @@ GEMINI_PROVIDER_VARS=(
 GEMINI_SECRET_VARS=(
     "GEMINI_API_KEY"
     "GOOGLE_APPLICATION_CREDENTIALS"
+    "GEMINI_OAUTH_TOKEN"
+    "GEMINI_REFRESH_TOKEN"
 )
 
 # ─── Usage ────────────────────────────────────────────────────────────────────
@@ -91,6 +95,8 @@ Examples:
 
 Environment Variables (supported in account files):
   GEMINI_API_KEY               API key for Gemini (paid/enterprise tier)
+  GEMINI_OAUTH_TOKEN           OAuth access token (headless mode)
+  GEMINI_REFRESH_TOKEN         OAuth refresh token (auto-renewal)
   GOOGLE_CLOUD_PROJECT         GCP project (required for Workspace accounts)
   GOOGLE_APPLICATION_CREDENTIALS  Path to service account JSON
   GEMINI_MODEL                 Default model override
@@ -166,12 +172,16 @@ list_accounts() {
         local auth_mode="oauth"
         local api_key_val
         api_key_val=$(_grep_env_key "GEMINI_API_KEY" "$file")
+        local oauth_token_val
+        oauth_token_val=$(_grep_env_key "GEMINI_OAUTH_TOKEN" "$file")
         local gcp_project
         gcp_project=$(_grep_env_key "GOOGLE_CLOUD_PROJECT" "$file")
         local model
         model=$(_grep_env_key "GEMINI_MODEL" "$file")
 
-        if [ -n "$api_key_val" ]; then
+        if [ -n "$oauth_token_val" ]; then
+            auth_mode="oauth-token"
+        elif [ -n "$api_key_val" ]; then
             auth_mode="api-key"
         elif [ -n "$gcp_project" ]; then
             auth_mode="workspace"
@@ -226,11 +236,19 @@ create_account() {
 # ─── Option 1: API Key (paid/enterprise tier) ──────────────────
 # GEMINI_API_KEY=ai-your-api-key-here
 
-# ─── Option 2: Google Workspace / GCP ──────────────────────────
+# ─── Option 2: OAuth Tokens (headless/non-interactive) ─────────
+# For headless OAuth usage (alternative to interactive browser login)
+# Generate tokens on an interactive machine, then copy here:
+# GEMINI_OAUTH_TOKEN=your-access-token-here
+# GEMINI_REFRESH_TOKEN=your-refresh-token-here
+#
+# Note: Access tokens expire hourly; refresh token auto-renews
+
+# ─── Option 3: Google Workspace / GCP ──────────────────────────
 # Required for Workspace accounts
 # GOOGLE_CLOUD_PROJECT=your-gcp-project-id
 
-# ─── Option 3: Service Account ─────────────────────────────────
+# ─── Option 4: Service Account ─────────────────────────────────
 # GOOGLE_APPLICATION_CREDENTIALS=/path/to/service-account.json
 
 # ─── Vertex AI (alternative to direct Gemini API) ──────────────
@@ -277,12 +295,15 @@ show_account() {
     echo "---"
 
     # Determine auth mode
-    local api_key_val gcp_project svc_creds
+    local api_key_val oauth_token_val gcp_project svc_creds
     api_key_val=$(_grep_env_key "GEMINI_API_KEY" "$file")
+    oauth_token_val=$(_grep_env_key "GEMINI_OAUTH_TOKEN" "$file")
     gcp_project=$(_grep_env_key "GOOGLE_CLOUD_PROJECT" "$file")
     svc_creds=$(_grep_env_key "GOOGLE_APPLICATION_CREDENTIALS" "$file")
 
-    if [ -n "$api_key_val" ]; then
+    if [ -n "$oauth_token_val" ]; then
+        echo "  Auth Mode: OAuth Token (headless)"
+    elif [ -n "$api_key_val" ]; then
         echo "  Auth Mode: API Key"
     elif [ -n "$gcp_project" ]; then
         echo "  Auth Mode: Google Workspace ($gcp_project)"
@@ -412,7 +433,11 @@ load_account() {
     echo "✅ Loaded account: $name"
 
     # Determine auth mode
-    if [ -n "${GEMINI_API_KEY:-}" ]; then
+    if [ -n "${GEMINI_OAUTH_TOKEN:-}" ]; then
+        echo "  Auth: OAuth Token (headless)"
+        echo "  OAuth Token: $(_mask_value "$GEMINI_OAUTH_TOKEN")"
+        [ -n "${GEMINI_REFRESH_TOKEN:-}" ] && echo "  Refresh Token: configured"
+    elif [ -n "${GEMINI_API_KEY:-}" ]; then
         echo "  Auth: API Key"
     elif [ -n "${GOOGLE_CLOUD_PROJECT:-}" ]; then
         echo "  Auth: Workspace (${GOOGLE_CLOUD_PROJECT})"

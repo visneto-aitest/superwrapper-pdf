@@ -8,11 +8,11 @@ Scripts for managing multiple accounts across 6 AI coding CLI tools. **6,412 lin
 
 | Tool | Env Script | Profile Script | Status Script | Config Override | Auth Storage |
 |------|-----------|----------------|---------------|-----------------|--------------|
-| **Kilo AI** | `kilo-env.sh` | `kilo-profile.sh` | `kilo-status.sh` | `KILO_PROVIDER`, `KILO_API_KEY` | `~/.local/share/kilo/auth.json` |
-| **OpenCode** | `opencode-env.sh` | `opencode-profile.sh` | `opencode-status.sh` | `OPENCODE_CONFIG_CONTENT` | `~/.local/share/opencode/auth.json` |
-| **Claude Code** | `claude/claude-env.sh` | `claude/claude-profile.sh` | `claude-status.sh` | `CLAUDE_CONFIG_DIR` | `~/.claude.json` |
+| **Kilo AI** | `kilo-env.sh` | `kilo-profile.sh` | `kilo-status.sh` | `KILO_PROVIDER`, `KILO_API_KEY`, `KILO_OAUTH_TOKEN` | `~/.local/share/kilo/auth.json` |
+| **OpenCode** | `opencode-env.sh` | `opencode-profile.sh` | `opencode-status.sh` | `OPENCODE_CONFIG_CONTENT`, `OPENCODE_OAUTH_TOKEN` | `~/.local/share/opencode/auth.json` |
+| **Claude Code** | `claude/claude-env.sh` | `claude/claude-profile.sh` | `claude-status.sh` | `CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN` | `~/.claude.json` |
 | **Qwen Code** | `qwen/qwen-env.sh` | `qwen/qwen-profile.sh` | `qwen-status.sh` | `.env` file loading | `~/.qwen/oauth_creds.json` |
-| **Gemini CLI** | `gemini-env.sh` | `gemini-profile.sh` | `gemini-status.sh` | `GEMINI_API_KEY`, `GOOGLE_CLOUD_PROJECT` | OAuth / `~/.gemini/` |
+| **Gemini CLI** | `gemini-env.sh` | `gemini-profile.sh` | `gemini-status.sh` | `GEMINI_API_KEY`, `GOOGLE_CLOUD_PROJECT`, `GEMINI_OAUTH_TOKEN` | OAuth / `~/.gemini/` |
 | **OpenAI Codex** | `codex-env.sh` | `codex-profile.sh` | `codex-status.sh` | `OPENAI_API_KEY` | `~/.codex/auth.json` |
 
 ### Productivity Utilities
@@ -98,6 +98,94 @@ usage-all.sh                      # Show usage for all tools
 usage-all.sh --summary            # Summary only
 usage-all.sh --json               # JSON output
 ```
+
+## OAuth Token Management
+
+All scripts now support OAuth tokens for headless/non-interactive usage, enabling CI/CD pipelines and remote server deployment.
+
+### OAuth Environment Variables
+
+| Tool | OAuth Token Variable | Refresh Token | Headless Support |
+|------|---------------------|---------------|------------------|
+| **Claude Code** | `CLAUDE_CODE_OAUTH_TOKEN` | Built-in | ✅ Full (1-year tokens) |
+| **Gemini CLI** | `GEMINI_OAUTH_TOKEN` | `GEMINI_REFRESH_TOKEN` | ✅ Full |
+| **OpenCode** | `OPENCODE_OAUTH_TOKEN` | Built-in | ✅ Partial |
+| **Kilo AI** | `KILO_OAUTH_TOKEN` | Built-in | ✅ Partial |
+| **Codex CLI** | _(use `OPENAI_API_KEY`)_ | N/A | ⚠️ Limited |
+
+### Generating OAuth Tokens
+
+```bash
+# Claude Code (recommended for headless)
+claude setup-token
+# Copy the output token and set:
+export CLAUDE_CODE_OAUTH_TOKEN="your-token-here"
+
+# Gemini CLI (on interactive machine)
+gemini  # Login interactively
+# Then extract from cache or use API key
+```
+
+### Using OAuth Tokens in Account Configs
+
+```bash
+# Create account with OAuth token
+claude-env.sh create ci-headless
+# Edit to add: CLAUDE_CODE_OAUTH_TOKEN=your-token-here
+claude-env.sh edit ci-headless
+
+# Use account
+claude-env.sh ci-headless claude "write unit tests"
+```
+
+### OAuth Helper Functions (from lib/common.sh)
+
+Source `lib/common.sh` to access these helpers:
+
+```bash
+source /path/to/scripts/lib/common.sh
+
+# Import OAuth token to CLI auth storage
+_import_oauth_token "claude" "your-oauth-token"
+_import_oauth_token "opencode" "your-token"
+
+# Export OAuth token from CLI auth storage
+_export_oauth_token "claude"
+
+# Check OAuth status
+_check_oauth_status "claude"
+_check_oauth_status "gemini"
+
+# Copy credentials between machines
+_copy_oauth_credentials "/path/to/source/auth.json" "claude"
+```
+
+### CI/CD Example
+
+```bash
+# In your CI pipeline
+export CLAUDE_CODE_OAUTH_TOKEN="${SECRET_CLAUDE_OAUTH_TOKEN}"
+export GEMINI_OAUTH_TOKEN="${SECRET_GEMINI_OAUTH_TOKEN}"
+
+# Run AI tasks
+claude-env.sh ci-task claude "implement feature"
+gemini-env.sh ci-task gemini "write documentation"
+```
+
+### Headless Server Setup
+
+For remote servers without browser access:
+
+1. **On your local machine:** Generate OAuth token
+2. **Transfer securely:** Use `scp`, secrets manager, or CI variables
+3. **On remote server:** Set environment variable or use `_import_oauth_token`
+
+**Codex CLI Workaround:** Since Codex requires interactive OAuth via `localhost:1455`, use SSH port forwarding:
+```bash
+ssh -L 1455:localhost:1455 user@remote
+# Then on remote: codex login
+```
+Or simply use `OPENAI_API_KEY` for headless Codex usage.
 
 ## Directory Structure
 
@@ -196,14 +284,19 @@ All critical helpers are centralized in `lib/common.sh`:
 - `_hash_account_file()` — bash 3.2 compatible active detection
 - `_backup_file()` — timestamped backups with permissions preservation
 - `_validate_env_file()` — KEY=value format checking with proper exit codes
+- **`_import_oauth_token()`** — import OAuth tokens to CLI auth storage
+- **`_export_oauth_token()`** — export OAuth tokens from CLI auth storage
+- **`_check_oauth_status()`** — check if OAuth credentials are active
+- **`_copy_oauth_credentials()`** — copy auth files between machines securely
 
 ### Gemini CLI Specifics
 
-Gemini CLI has two auth modes:
+Gemini CLI has three auth modes:
 1. **OAuth (free tier)** — Google Account login, no API key needed
 2. **API Key (paid/enterprise)** — `GEMINI_API_KEY` for higher quotas
+3. **OAuth Tokens (headless)** — `GEMINI_OAUTH_TOKEN` + `GEMINI_REFRESH_TOKEN` for CI/CD
 
-Workspace accounts additionally require `GOOGLE_CLOUD_PROJECT`. The env script handles both modes transparently.
+Workspace accounts additionally require `GOOGLE_CLOUD_PROJECT`. The env script handles all three modes transparently.
 
 ## User Guides
 
@@ -257,3 +350,26 @@ For a medium feature (user authentication system):
 - **This toolchain:** 2 hours → $100 + $1.20 AI cost
 
 ## Tool-Specific Notes
+
+### OpenCode OAuth
+
+OpenCode uses OAuth Device Authorization Flow. For headless usage:
+- Set `OPENCODE_OAUTH_TOKEN` environment variable
+- Or copy `~/.local/share/opencode/auth.json` from an interactive machine
+- MCP servers support OAuth via `opencode mcp auth [name]`
+
+### Claude Code OAuth
+
+Claude Code has the best OAuth support:
+- `claude setup-token` generates 1-year OAuth tokens
+- Set `CLAUDE_CODE_OAUTH_TOKEN` for headless/CI usage
+- Tokens are scoped to inference only (no Remote Control sessions)
+- Requires Pro, Max, Team, or Enterprise subscription
+
+### Codex CLI OAuth Limitations
+
+Codex CLI currently requires interactive OAuth via `localhost:1455` callback:
+- **Recommended:** Use `OPENAI_API_KEY` for headless usage
+- **Workaround 1:** SSH port forwarding (`ssh -L 1455:localhost:1455 user@remote`)
+- **Workaround 2:** Copy `~/.codex/auth.json` from interactive machine
+- Future updates may add device code flow support

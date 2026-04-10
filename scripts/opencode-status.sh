@@ -475,10 +475,12 @@ output_json() {
     config_file=$(_find_config)
 
     python3 -c "
-import json, os, glob
+import json, os, glob, sys
+
+config_file = sys.argv[1]
 
 result = {
-    'config_file': '$config_file' or 'not found',
+    'config_file': config_file or 'not found',
     'providers': {},
     'session_summary': {},
     'rate_limits': {
@@ -491,7 +493,7 @@ result = {
 }
 
 try:
-    cfg = json.load(open('$config_file'))
+    cfg = json.load(open(config_file))
     for name, pconf in cfg.get('provider', {}).items():
         opts = pconf.get('options', {})
         key = opts.get('apiKey', '')
@@ -527,7 +529,7 @@ except:
     pass
 
 print(json.dumps(result, indent=2))
-" 2>/dev/null || echo '{"error": "Unable to generate JSON output"}'
+" "$config_file" 2>/dev/null || echo '{"error": "Unable to generate JSON output"}'
 }
 
 # ─── Full Status ──────────────────────────────────────────────────────────────
@@ -544,7 +546,7 @@ show_full_status() {
     if [ -n "$config_file" ]; then
         echo "  Config: $config_file"
         local model
-        model=$(python3 -c "import json; print(json.load(open('$config_file')).get('model', 'not set'))" 2>/dev/null || echo "not set")
+        model=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('model', 'not set'))" "$config_file" 2>/dev/null || echo "not set")
         echo "  Model:  $model"
     else
         echo "  ⚠ No config file found"

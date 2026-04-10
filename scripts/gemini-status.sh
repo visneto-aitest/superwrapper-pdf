@@ -126,7 +126,7 @@ check_auth() {
     if [ -f "$GEMINI_SETTINGS" ]; then
         echo "  Settings: $GEMINI_SETTINGS"
         local model
-        model=$(python3 -c "import json; print(json.load(open('$GEMINI_SETTINGS')).get('model', 'default'))" 2>/dev/null || echo "unknown")
+        model=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('model', 'default'))" "$GEMINI_SETTINGS" 2>/dev/null || echo "unknown")
         echo "  Configured model: $model"
     else
         echo "  ⚠ No settings.json found at $GEMINI_SETTINGS"
@@ -176,7 +176,7 @@ verify_key() {
         if [ -f "$GOOGLE_APPLICATION_CREDENTIALS" ]; then
             echo "  ✅ Credentials file exists."
             local email
-            email=$(python3 -c "import json; print(json.load(open('$GOOGLE_APPLICATION_CREDENTIALS')).get('client_email', 'unknown'))" 2>/dev/null || echo "unknown")
+            email=$(python3 -c "import json, sys; print(json.load(open(sys.argv[1])).get('client_email', 'unknown'))" "$GOOGLE_APPLICATION_CREDENTIALS" 2>/dev/null || echo "unknown")
             echo "  Service account: $email"
         else
             echo "  ❌ Credentials file not found."
@@ -212,11 +212,11 @@ show_rate_limits() {
 
 output_json() {
     python3 -c "
-import json, os
+import json, os, sys
 
 result = {
     'auth_mode': 'unknown',
-    'settings_file': '$GEMINI_SETTINGS',
+    'settings_file': sys.argv[1],
     'rate_limits': {
         'oauth_free': '15 RPM / 1M TPM / 1500 RPD',
         'api_key_free': '15 RPM / 1M TPM / 1500 RPD',
@@ -241,14 +241,14 @@ result['region'] = os.environ.get('GEMINI_REGION', '')
 result['vertex_project'] = os.environ.get('VERTEXAI_PROJECT', '')
 
 try:
-    cfg = json.load(open('$GEMINI_SETTINGS'))
+    cfg = json.load(open(sys.argv[1]))
     result['config_model'] = cfg.get('model', 'default')
     result['config_theme'] = cfg.get('theme', 'default')
 except:
     pass
 
 print(json.dumps(result, indent=2))
-" 2>/dev/null || echo '{"error": "Unable to generate JSON"}'
+" "$GEMINI_SETTINGS" 2>/dev/null || echo '{"error": "Unable to generate JSON"}'
 }
 
 # ─── Full Status ──────────────────────────────────────────────────────────────

@@ -73,12 +73,12 @@ _backup_auth() {
 
 # Parse model string from opencode.json
 _parse_model() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         python3 -c "
-import json
+import json, sys
 try:
-    cfg = json.load(open('$file'))
+    cfg = json.load(open(sys.argv[1]))
     model = cfg.get('model', 'not set')
     small = cfg.get('small_model', '')
     if small:
@@ -87,7 +87,7 @@ try:
         print(model)
 except Exception as e:
     print(f'(parse error: {e})')
-" 2>/dev/null || echo "(parse error)"
+" "$file" 2>/dev/null || echo "(parse error)"
     elif command -v jq &>/dev/null; then
         local model small
         model=$(jq -r '.model // "not set"' "$file" 2>/dev/null)
@@ -104,12 +104,12 @@ except Exception as e:
 
 # Parse enabled providers from opencode.json
 _parse_providers() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         python3 -c "
-import json
+import json, sys
 try:
-    cfg = json.load(open('$file'))
+    cfg = json.load(open(sys.argv[1]))
     providers = list(cfg.get('provider', {}).keys())
     disabled = cfg.get('disabled_providers', [])
     enabled = cfg.get('enabled_providers', providers)
@@ -117,7 +117,7 @@ try:
     print(','.join(active) if active else 'none')
 except:
     print('unknown')
-" 2>/dev/null || echo "unknown"
+" "$file" 2>/dev/null || echo "unknown"
     else
         echo "unknown"
     fi
@@ -125,12 +125,12 @@ except:
 
 # Parse mode configs from opencode.json
 _parse_modes() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         python3 -c "
-import json
+import json, sys
 try:
-    cfg = json.load(open('$file'))
+    cfg = json.load(open(sys.argv[1]))
     modes = cfg.get('mode', {})
     if modes:
         for name, mcfg in modes.items():
@@ -140,7 +140,7 @@ try:
         print('  (no mode overrides)')
 except:
     print('  (parse error)')
-" 2>/dev/null || echo "  (parse error)"
+" "$file" 2>/dev/null || echo "  (parse error)"
     else
         echo "  (no parser available)"
     fi

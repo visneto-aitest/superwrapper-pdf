@@ -124,17 +124,20 @@ run_agent() {
     # Generate result summary
     python3 -c "
 import json, os, sys
-log = open('$logfile').read()
-files = [f for f in os.listdir('$workdir') if os.path.isfile(f) and f not in ['agent.log', 'result.json']]
+log = open(sys.argv[1]).read()
+workdir = sys.argv[2]
+resultfile = sys.argv[3]
+tool = sys.argv[4]
+files = [f for f in os.listdir(workdir) if os.path.isfile(f) and f not in ['agent.log', 'result.json']]
 result = {
-    'tool': '$tool',
-    'status': 'completed' if os.path.exists('$workdir/.success') else 'partial',
+    'tool': tool,
+    'status': 'completed' if os.path.exists(os.path.join(workdir, '.success')) else 'partial',
     'files_modified': files,
     'log_length': len(log),
     'exit_code': 0
 }
-json.dump(result, open('$resultfile', 'w'), indent=2)
-" 2>/dev/null || echo '{"tool":"'"$tool"'","status":"failed"}' > "$resultfile"
+json.dump(result, open(resultfile, 'w'), indent=2)
+" "$logfile" "$workdir" "$resultfile" "$tool" 2>/dev/null || echo '{"tool":"'"$tool"'","status":"failed"}' > "$resultfile"
 }
 
 # Compare results and select best
@@ -194,13 +197,27 @@ print()
 if best:
     print(f'  ✅ Best result: {best[\"tool\"]} (score: {max_score})')
     print(f'     Workdir: {sys.argv[1].rsplit(\"/\",1)[0]}/{best[\"tool\"]}')
-" "${results[@]}"
+    # Output best tool name to stdout for bash to capture (prefixed with BEST:)
+    print(f'BEST:{best[\"tool\"]}')
+" "${results[@]}" | tee "$workdir/scoring_output.txt"
 
     echo ""
-    read -p "Apply best result? (y/N) " -n 1 -r apply
+
+    # Extract best tool from scoring output
+    local best_tool
+    best_tool=$(grep '^BEST:' "$workdir/scoring_output.txt" 2>/dev/null | head -1 | cut -d: -f2)
+    if [ -z "$best_tool" ]; then
+        # Fallback: parse the scoring output for the highest score
+        best_tool=$(grep '✅ Best result:' "$workdir/scoring_output.txt" 2>/dev/null | sed 's/.*Best result: \([^ ]*\).*/\1/')
+    fi
+    if [ -z "$best_tool" ]; then
+        echo "⚠ Could not determine best tool, using first available"
+        best_tool=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('tool','unknown'))" "${results[0]}" 2>/dev/null || echo "unknown")
+    fi
+
+    read -p "Apply best result from $best_tool? (y/N) " -n 1 -r apply
     echo
     if [[ $apply =~ ^[Yy]$ ]]; then
-        local best_tool=$(python3 -c "import json; print(json.load(open('${results[0]}'))['tool'])" 2>/dev/null || echo "unknown")
         if [ -d "$workdir/$best_tool" ]; then
             echo "  Applying changes from $best_tool..."
             rsync -a "$workdir/$best_tool/" ./ --exclude='.git' --exclude='agent.log' --exclude='result.json'

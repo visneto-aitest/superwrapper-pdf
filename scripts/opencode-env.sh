@@ -41,6 +41,8 @@ OPENCODE_PROVIDER_VARS=(
     "AWS_SECRET_ACCESS_KEY"
     "AWS_REGION"
     "GITHUB_TOKEN"
+    "OPENCODE_OAUTH_TOKEN"
+    "OPENCODE_AUTH_FILE"
 )
 
 # Compute SHA256 hash of a string (portable)
@@ -160,6 +162,8 @@ Environment Variables (supported in account files):
   AWS_ACCESS_KEY_ID     AWS Bedrock credentials
   AWS_SECRET_ACCESS_KEY
   AWS_REGION
+  OPENCODE_OAUTH_TOKEN  OAuth token for headless/non-interactive usage
+  OPENCODE_AUTH_FILE    Custom auth.json path (default: ~/.local/share/opencode/auth.json)
   OPENCODE_DEFAULT_PROVIDER  Route to specific provider
   OPENCODE_DEFAULT_MODEL     Default model string
   OPENCODE_CONFIG_CONTENT  Full JSON config override
@@ -336,6 +340,15 @@ create_account() {
 
 # ─── GitHub Copilot (if using Copilot auth) ─────────────────────
 # GITHUB_TOKEN=ghp_your-token
+
+# ─── OAuth Token (headless/non-interactive) ─────────────────────
+# For remote/headless servers where browser OAuth is not possible
+# Generate token on an interactive machine, then copy here:
+# OPENCODE_OAUTH_TOKEN=your-oauth-token-here
+#
+# Alternative: Copy ~/.local/share/opencode/auth.json from interactive machine
+# Or set custom auth file path:
+# OPENCODE_AUTH_FILE=/path/to/custom/auth.json
 
 # ─── Default Routing ────────────────────────────────────────────
 # Which provider/model to use by default
@@ -546,6 +559,14 @@ load_account() {
 
     if [ ${#active_providers[@]} -gt 0 ]; then
         echo "  Providers: $(IFS=','; echo "${active_providers[*]}")"
+    fi
+
+    # Check OAuth token status
+    if [ -n "${OPENCODE_OAUTH_TOKEN:-}" ]; then
+        echo "  OAuth Token: $(_mask_value "$OPENCODE_OAUTH_TOKEN")"
+    fi
+    if [ -n "${OPENCODE_AUTH_FILE:-}" ]; then
+        echo "  Auth File: ${OPENCODE_AUTH_FILE}"
     fi
 
     if [ -n "${OPENCODE_DEFAULT_PROVIDER:-}" ] && [ -n "${OPENCODE_DEFAULT_MODEL:-}" ]; then

@@ -203,7 +203,7 @@ _qwen_oauth_list() {
         local email="unknown"
         if [ -f "$creds_file" ]; then
             if command -v python3 &>/dev/null; then
-                email=$(python3 -c "import json; d=json.load(open('$creds_file')); print(d.get('email','unknown'))" 2>/dev/null || echo "unknown")
+                email=$(python3 -c "import json, sys; d=json.load(open(sys.argv[1])); print(d.get('email','unknown'))" "$creds_file" 2>/dev/null || echo "unknown")
             elif command -v jq &>/dev/null; then
                 email=$(jq -r '.email // "unknown"' "$creds_file" 2>/dev/null || echo "unknown")
             fi
@@ -315,7 +315,7 @@ _qwen_oauth_current() {
     
     local email="unknown"
     if command -v python3 &>/dev/null; then
-        email=$(python3 -c "import json; d=json.load(open('$current')); print(d.get('email','unknown'))" 2>/dev/null || echo "unknown")
+        email=$(python3 -c "import json, sys; d=json.load(open(sys.argv[1])); print(d.get('email','unknown'))" "$current" 2>/dev/null || echo "unknown")
     elif command -v jq &>/dev/null; then
         email=$(jq -r '.email // "unknown"' "$current" 2>/dev/null || echo "unknown")
     fi

@@ -309,8 +309,8 @@ show_forecast() {
     echo ""
 
     if [ -n "$THRESHOLD_DAILY" ]; then
-        if (( $(echo "$total_cost > $threshold" | bc -l 2>/dev/null || echo "0") )); then
-            echo "  ⚠️  ALERT: Daily cost ($(fmt_cost "$total_cost")) exceeds threshold ($(fmt_cost "$threshold"))"
+        if (( $(echo "$total_daily > $THRESHOLD_DAILY" | bc -l 2>/dev/null || echo "0") )); then
+            echo "  ⚠️  ALERT: Daily cost ($(fmt_cost "$total_daily")) exceeds threshold ($(fmt_cost "$THRESHOLD_DAILY"))"
         else
             echo "  ✅ Daily cost is within threshold"
         fi

@@ -57,6 +57,8 @@ KILO_PROVIDER_VARS=(
     "GITHUB_TOKEN"
     "KILO_API_KEY"
     "KILO_ORG_ID"
+    "KILO_OAUTH_TOKEN"
+    "KILO_AUTH_FILE"
 )
 
 KILO_SECRET_VARS=(
@@ -71,6 +73,7 @@ KILO_SECRET_VARS=(
     "AWS_SECRET_ACCESS_KEY"
     "GITHUB_TOKEN"
     "KILO_API_KEY"
+    "KILO_OAUTH_TOKEN"
 )
 
 # ─── Usage ────────────────────────────────────────────────────────────────────
@@ -118,6 +121,8 @@ Environment Variables (supported in account files):
   GITHUB_TOKEN          GitHub Copilot token
   KILO_API_KEY          Kilo Gateway API key
   KILO_ORG_ID           Kilo Gateway organization ID
+  KILO_OAUTH_TOKEN      OAuth token for headless/non-interactive usage
+  KILO_AUTH_FILE        Custom auth.json path (default: ~/.local/share/kilo/auth.json)
 
 Kilo Configuration:
   Config file:  ~/.config/kilo/kilo.jsonc
@@ -314,6 +319,15 @@ create_account() {
 # ─── GitHub Copilot (OAuth alternative) ─────────────────────────
 # GITHUB_TOKEN=ghp_your-token
 
+# ─── OAuth Token (headless/non-interactive) ─────────────────────
+# For remote/headless servers where browser OAuth is not possible
+# Generate token on an interactive machine, then copy here:
+# KILO_OAUTH_TOKEN=your-oauth-token-here
+#
+# Alternative: Copy ~/.local/share/kilo/auth.json from interactive machine
+# Or set custom auth file path:
+# KILO_AUTH_FILE=/path/to/custom/auth.json
+
 # ─── Kilo Gateway (optional) ────────────────────────────────────
 # KILO_API_KEY=kilo_your-key
 # KILO_ORG_ID=your-org-id
@@ -469,12 +483,22 @@ load_account() {
                 AWS_ACCESS_KEY_ID) active_providers+=("bedrock") ;;
                 GITHUB_TOKEN) active_providers+=("github") ;;
                 KILO_API_KEY) active_providers+=("kilo-gateway") ;;
+                KILO_OAUTH_TOKEN) active_providers+=("kilo-oauth") ;;
             esac
         fi
     done
 
+    # Check OAuth token status
+    if [ -n "${KILO_OAUTH_TOKEN:-}" ]; then
+        echo "  OAuth Token: $(_mask_value "$KILO_OAUTH_TOKEN")"
+    fi
+    if [ -n "${KILO_AUTH_FILE:-}" ]; then
+        echo "  Auth File: ${KILO_AUTH_FILE}"
+    fi
+
     # Detect OAuth providers from auth.json
-    if [ -f "$KILO_AUTH_FILE" ] && command -v python3 &>/dev/null; then
+    local auth_file_to_check="${KILO_AUTH_FILE:-$KILO_AUTH_FILE}"
+    if [ -f "$auth_file_to_check" ] && command -v python3 &>/dev/null; then
         while IFS= read -r prov; do
             [ -n "$prov" ] && active_providers+=("$prov(oauth)")
         done < <(python3 -c '
@@ -486,7 +510,7 @@ try:
             print(name)
 except:
     pass
-' "$KILO_AUTH_FILE" 2>/dev/null || true)
+' "$auth_file_to_check" 2>/dev/null || true)
     fi
 
     if [ ${#active_providers[@]} -gt 0 ]; then

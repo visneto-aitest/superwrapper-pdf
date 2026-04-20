@@ -21,6 +21,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
 CODEX_ACCOUNTS_DIR="${CODEX_ACCOUNTS_DIR:-${HOME}/.config/codex/accounts}"
 CODEX_HOME="${CODEX_HOME:-${HOME}/.codex}"
 CODEX_CONFIG="${CODEX_HOME}/config.toml"
@@ -50,22 +53,7 @@ _get_editor() {
     echo "${EDITOR:-${VISUAL:-nano}}"
 }
 
-_validate_env_file() {
-    local file=$1
-    local line_num=0
-    local errors=0
 
-    while IFS= read -r line || [ -n "$line" ]; do
-        line_num=$((line_num + 1))
-        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-        if [[ ! "$line" =~ ^[A-Z_]+= ]]; then
-            echo "  ⚠ Line $line_num: Invalid format: ${line:0:50}"
-            errors=$((errors + 1))
-        fi
-    done < "$file"
-
-    return $errors
-}
 
 _mask_value() {
     local val="$1"
@@ -481,6 +469,18 @@ run_with_account() {
 
     if [ ! -f "$file" ]; then
         echo "❌ Error: Account '$name' not found at $file"
+        exit 1
+    fi
+
+    # Validate directory permissions before sourcing
+    local dir_perms
+    if stat -f '%A' "$CODEX_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -f '%A' "$CODEX_ACCOUNTS_DIR")
+    elif stat -c '%a' "$CODEX_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -c '%a' "$CODEX_ACCOUNTS_DIR")
+    fi
+    if [ "${dir_perms:-}" != "600" ] && [ "${dir_perms:-}" != "700" ]; then
+        echo "❌ Error: Accounts directory has unsafe permissions: ${dir_perms:-unknown}"
         exit 1
     fi
 

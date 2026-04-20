@@ -7,7 +7,7 @@
 //! |--------|---------|----------|
 //! | [`FastEngine`] | Quick text extraction | High-speed text extraction, large batch processing |
 //! | [`StructuredEngine`] | Structured content extraction | Markdown conversion, content analysis |
-//! | [`VisualEngine`] | Visual rendering | PDF-to-image conversion, visual processing |
+//! | <br> | Visual rendering | PDF-to-image conversion, visual processing |
 //!
 //! ## Quick Start
 //!
@@ -46,7 +46,7 @@
 //!
 //! All engines implement [`Send`] and [`Sync`] traits, making them safe to share across threads.
 //! The library uses [`rayon`] for parallel processing where beneficial, and integrates with
-//! [`tokio`] for async support when the `async` feature is enabled.
+//! the `async` feature for async support when enabled.
 //!
 //! ## Error Handling
 //!
@@ -75,8 +75,17 @@ pub mod engine;
 pub mod error;
 pub mod types;
 
+#[cfg(feature = "async")]
+pub mod async_runtime;
+
+#[cfg(feature = "async")]
+pub mod cache;
+
 #[cfg(feature = "visual")]
 pub use engine::VisualEngine;
 pub use engine::{FastEngine, PdfEngine, StructuredEngine};
 pub use error::{Result, SuperWrapperError};
-pub use types::{ExtractionConfig, ExtractionMode, ExtractionResult, ImageFormat, PageInfo};
+pub use types::{
+    ExtractionChunk, ExtractionConfig, ExtractionMode, ExtractionProgress, ExtractionResult,
+    ImageFormat, PageInfo, ProgressCallback,
+};

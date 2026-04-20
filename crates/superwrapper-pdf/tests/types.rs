@@ -4,6 +4,9 @@ use superwrapper_pdf::types::{
     ExtractionConfig, ExtractionMode, ExtractionResult, ImageFormat, PageInfo,
 };
 
+#[cfg(feature = "visual")]
+use image;
+
 #[test]
 fn test_extraction_config_default() {
     let config = ExtractionConfig::default();
@@ -114,18 +117,21 @@ fn test_page_info_serialization() {
     assert!(json.contains("Test content"));
 }
 
+#[cfg(feature = "visual")]
 #[test]
 fn test_image_format_png() {
     let format = ImageFormat::Png;
     assert_eq!(format.to_image_format(), image::ImageFormat::Png);
 }
 
+#[cfg(feature = "visual")]
 #[test]
 fn test_image_format_jpeg() {
     let format = ImageFormat::Jpeg(80);
     assert_eq!(format.to_image_format(), image::ImageFormat::Jpeg);
 }
 
+#[cfg(feature = "visual")]
 #[test]
 fn test_image_format_clone() {
     let format = ImageFormat::Jpeg(90);
@@ -227,6 +233,9 @@ fn test_config_clone() {
         page_range: Some(1..=3),
         password: Some("pass".to_string()),
         parallel: true,
+        progress_callback: None,
+        streaming: false,
+        chunk_size: None,
     };
 
     let cloned = config.clone();

@@ -149,7 +149,6 @@ impl SuperWrapperError {
             SuperWrapperError::PdfParse { path: p, .. } => *p = Some(path_str),
             SuperWrapperError::Encrypted { path: p } => *p = Some(path_str),
             SuperWrapperError::PageOutOfRange { path: p, .. } => *p = Some(path_str),
-            SuperWrapperError::Pdfium { path: p, .. } => *p = Some(path_str),
             _ => {}
         }
         self
@@ -162,7 +161,6 @@ impl SuperWrapperError {
             SuperWrapperError::PdfParse { path, .. } => path.as_deref(),
             SuperWrapperError::Encrypted { path } => path.as_deref(),
             SuperWrapperError::PageOutOfRange { path, .. } => path.as_deref(),
-            SuperWrapperError::Pdfium { path, .. } => path.as_deref(),
             _ => None,
         }
     }

@@ -155,16 +155,17 @@ list_profiles() {
     echo "Available profiles:"
     echo ""
 
-    shopt -s nullglob 2>/dev/null || true
-    local dirs=("$OLLAMA_PROFILES_DIR"/*/)
-    shopt -u nullglob 2>/dev/null || true
-
     local active_profile=""
     if [ -f "$OLLAMA_ACTIVE_MARKER" ]; then
         active_profile=$(cat "$OLLAMA_ACTIVE_MARKER")
     fi
 
-    for profile_dir in "${dirs[@]}"; do
+    (
+        shopt -s nullglob 2>/dev/null || true
+        local dirs=("$OLLAMA_PROFILES_DIR"/*/)
+        shopt -u nullglob 2>/dev/null || true
+
+        for profile_dir in "${dirs[@]}"; do
         [ -d "$profile_dir" ] || continue
         has_profiles=true
         local name
@@ -181,7 +182,8 @@ list_profiles() {
         else
             echo "  - ${name}${marker}  (no Modelfile)"
         fi
-    done
+        done
+    )
 
     if [ "$has_profiles" = false ]; then
         echo "No profiles found. Create one with: ollama-profile.sh create <name>"
@@ -387,7 +389,10 @@ _validate_modelfile() {
         errors=$((errors + 1))
     fi
 
-    return $errors
+    if [ "$errors" -gt 0 ]; then
+        return 1
+    fi
+    return 0
 }
 
 validate_profile() {

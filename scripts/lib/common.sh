@@ -136,7 +136,9 @@ _grep_env_key() {
     local key="$1"
     local file="$2"
     local result=""
-    result=$(grep -E "^${key}=" "$file" 2>/dev/null | head -1 | cut -d'=' -f2-) || result=""
+    local escaped_key
+    escaped_key=$(printf '%s' "$key" | sed 's/[][\\.^$*+?(){}|/]/\\&/g')
+    result=$(grep -E "^${escaped_key}=" "$file" 2>/dev/null | head -1 | cut -d'=' -f2-) || result=""
     printf '%s' "$result"
 }
 
@@ -397,18 +399,18 @@ _copy_oauth_credentials() {
     local source="$1"
     local tool="$2"
     local dest="${3:-}"
-    
+
     if [ -z "$source" ] || [ -z "$tool" ]; then
         printf '❌ Error: Source path and tool name required.\n'
         printf 'Usage: _copy_oauth_credentials <source_path> <tool> [dest_path]\n'
         return 1
     fi
-    
+
     if [ ! -f "$source" ]; then
         printf '❌ Error: Source file not found: %s\n' "$source"
         return 1
     fi
-    
+
     # Determine destination path
     case "$tool" in
         claude)
@@ -431,20 +433,68 @@ _copy_oauth_credentials() {
             return 1
             ;;
     esac
-    
+
     # Validate source is valid JSON
     if ! _validate_json "$source"; then
         printf '❌ Error: Source file is not valid JSON\n'
         return 1
     fi
-    
+
     # Copy credentials
     mkdir -p "$(dirname "$dest")"
     cp "$source" "$dest"
     chmod 600 "$dest"
-    
+
     printf '✅ OAuth credentials copied to: %s\n' "$dest"
     printf '⚠ Ensure this matches the source machine credentials\n'
+    return 0
+}
+
+# Secure curl wrapper - hides API keys from process list
+# Usage: _curl_secure "https://api.example.com" "x-api-key: $API_KEY"
+# Sets default timeouts: --connect-timeout 10 --max-time 30
+_curl_secure() {
+    local url="$1"
+    shift
+    local headers=("$@")
+    local tmpfile
+    tmpfile=$(mktemp)
+    chmod 600 "$tmpfile"
+
+    for header in "${headers[@]}"; do
+        printf 'header = "%s"\n' "$header" >> "$tmpfile"
+    done
+
+    curl -s --connect-timeout 10 --max-time 30 --config "$tmpfile" "$url"
+    local exit_code=$?
+    rm -f "$tmpfile"
+    return $exit_code
+}
+
+# Validate directory has safe permissions before sourcing .env files
+# Usage: _validate_directory_permissions "/path/to/accounts"
+# Returns 0 if safe (600 or 700), 1 otherwise
+_validate_directory_permissions() {
+    local dir="$1"
+    if [ ! -d "$dir" ]; then
+        printf '❌ Error: Directory does not exist: %s\n' "$dir"
+        return 1
+    fi
+
+    local dir_perms
+    if stat -f '%A' "$dir" 2>/dev/null; then
+        dir_perms=$(stat -f '%A' "$dir")
+    elif stat -c '%a' "$dir" 2>/dev/null; then
+        dir_perms=$(stat -c '%a' "$dir")
+    else
+        printf '❌ Error: Unable to check permissions for: %s\n' "$dir"
+        return 1
+    fi
+
+    if [ "$dir_perms" != "600" ] && [ "$dir_perms" != "700" ]; then
+        printf '❌ Error: Directory has unsafe permissions: %s (expected 600 or 700)\n' "$dir_perms"
+        return 1
+    fi
     return 0
 }
 

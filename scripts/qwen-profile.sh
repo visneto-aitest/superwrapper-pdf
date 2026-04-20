@@ -31,7 +31,7 @@ _get_editor() {
 }
 
 _validate_json() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$file" 2>/dev/null; then
             return 1

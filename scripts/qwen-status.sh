@@ -170,19 +170,19 @@ except:
     case "$provider" in
         openai)
             local response
-            response=$(curl -s -w "\n%{http_code}" -H "Authorization: Bearer $api_key" "https://api.openai.com/v1/models" 2>/dev/null) || { echo "  ❌ Failed to connect."; return; }
+            response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" -H "Authorization: Bearer $api_key" "https://api.openai.com/v1/models" 2>/dev/null) || { echo "  ❌ Failed to connect."; return; }
             local http_code; http_code=$(echo "$response" | tail -1)
             case "$http_code" in 200) echo "  ✅ Valid." ;; 401) echo "  ❌ Invalid." ;; 429) echo "  ⚠ Rate limited." ;; *) echo "  ❌ HTTP $http_code." ;; esac
             ;;
         anthropic)
             local response
-            response=$(curl -s -w "\n%{http_code}" -H "x-api-key: $api_key" -H "anthropic-version: 2023-06-01" -H "Content-Type: application/json" -d '{"model":"claude-sonnet-4-20250514","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' "https://api.anthropic.com/v1/messages" 2>/dev/null) || { echo "  ❌ Failed to connect."; return; }
+            response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" -H "x-api-key: $api_key" -H "anthropic-version: 2023-06-01" -H "Content-Type: application/json" -d '{"model":"claude-sonnet-4-20250514","max_tokens":1,"messages":[{"role":"user","content":"hi"}]}' "https://api.anthropic.com/v1/messages" 2>/dev/null) || { echo "  ❌ Failed to connect."; return; }
             local http_code; http_code=$(echo "$response" | tail -1)
             case "$http_code" in 200) echo "  ✅ Valid." ;; 401|403) echo "  ❌ Invalid." ;; 429) echo "  ⚠ Rate limited." ;; *) echo "  ❌ HTTP $http_code." ;; esac
             ;;
         gemini)
             local response
-            response=$(curl -s -w "\n%{http_code}" \
+            response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
                 -H "x-goog-api-key: $api_key" \
                 "https://generativelanguage.googleapis.com/v1beta/models" 2>/dev/null) || { echo "  ❌ Failed to connect."; return; }
             local http_code; http_code=$(echo "$response" | tail -1)

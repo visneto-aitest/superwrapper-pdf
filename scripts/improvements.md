@@ -494,12 +494,14 @@ Consider using a compatibility layer or documenting platform requirements.
 - [x] Fix Python injection in `*-status.sh` and other scripts (C4b) ✅
 
 ### Phase 2: Security & Reliability (This Week)
-- [ ] Unify `_validate_env_file` implementations (H1)
-- [ ] Add connection timeouts to all `curl` calls (H3)
-- [ ] Add directory permission validation before `source` (H4)
-- [ ] Fix `return $errors` exit codes (H5)
-- [ ] Quote all variable assignments (H6)
-- [ ] Fix `nullglob` scope issues (H7)
+- [x] Unify `_validate_env_file` implementations (H1)
+- [x] API Key Visibility in Process List (H2)
+- [x] Add connection timeouts to all `curl` calls (H3)
+- [x] Add directory permission validation before `source` (H4)
+- [x] Fix `return $errors` exit codes (H5)
+- [x] Quote all variable assignments (H6)
+- [x] Fix `nullglob` scope issues (H7)
+- [x] `_grep_env_key` Regex Metacharacters Not Escaped (H8)
 
 ### Phase 3: Code Quality (Next Sprint)
 - [ ] Consolidate `*-env.sh` duplication (M1)
@@ -517,13 +519,8 @@ Consider using a compatibility layer or documenting platform requirements.
 
 ## Overall Assessment
 
-**Code Quality Score: B+ (85/100)**
+**Code Quality Score: A- (90/100)**
 
-The scripts demonstrate strong engineering with good security practices, clean architecture, and useful productivity features. The main areas for improvement are:
-1. Code reuse across similar scripts
-2. Edge case handling in Python subprocess calls
-3. Standardization of patterns across tools
+The scripts demonstrate strong engineering with good security practices, clean architecture, and useful productivity features. Phase 2 security and reliability fixes have been applied, significantly improving the codebase.
 
-The OAuth token support recently added significantly improves CI/CD and headless server capabilities, which is a major enhancement.
-
-**Recommendation:** Address Phase 1 critical bugs immediately, then work through Phases 2-3 systematically. Phase 4 items can be prioritized based on user feedback.
+**Recommendation:** Work through Phase 3 code quality improvements systematically. Phase 4 items can be prioritized based on user feedback.

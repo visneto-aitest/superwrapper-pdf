@@ -1,0 +1,13 @@
+[package]
+name = "serde-output-example"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "serde-output-example"
+path = "main.rs"
+
+[dependencies]
+superwrapper-pdf = { path = "../../crates/superwrapper-pdf" }
+serde = "1"
+serde_json = "1"

@@ -236,7 +236,7 @@ except:
     case "$provider" in
         anthropic)
             local response
-            response=$(curl -s -w "\n%{http_code}" \
+            response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
                 -H "x-api-key: $api_key" \
                 -H "anthropic-version: 2023-06-01" \
                 -H "Content-Type: application/json" \
@@ -257,7 +257,7 @@ except:
             ;;
         openai)
             local response
-            response=$(curl -s -w "\n%{http_code}" \
+            response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
                 -H "Authorization: Bearer $api_key" \
                 "https://api.openai.com/v1/models" 2>/dev/null) || {
                 echo "  ❌ Failed to connect to OpenAI API."
@@ -275,7 +275,7 @@ except:
             ;;
         groq)
             local response
-            response=$(curl -s -w "\n%{http_code}" \
+            response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
                 -H "Authorization: Bearer $api_key" \
                 "https://api.groq.com/openai/v1/models" 2>/dev/null) || {
                 echo "  ❌ Failed to connect to Groq API."
@@ -292,7 +292,7 @@ except:
             ;;
         openrouter)
             local response
-            response=$(curl -s -w "\n%{http_code}" \
+            response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
                 -H "Authorization: Bearer $api_key" \
                 "https://openrouter.ai/api/v1/auth/key" 2>/dev/null) || {
                 echo "  ❌ Failed to connect to OpenRouter."
@@ -314,7 +314,7 @@ except:
             ;;
         gemini)
             local response
-            response=$(curl -s -w "\n%{http_code}" \
+            response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
                 -H "x-goog-api-key: $api_key" \
                 "https://generativelanguage.googleapis.com/v1beta/models" 2>/dev/null) || {
                 echo "  ❌ Failed to connect to Google AI Studio."

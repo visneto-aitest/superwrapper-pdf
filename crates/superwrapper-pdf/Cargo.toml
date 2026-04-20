@@ -11,6 +11,9 @@ serde.workspace = true
 serde_json.workspace = true
 rayon.workspace = true
 tempfile = "3"
+tokio = { workspace = true, optional = true }
+futures = { version = "0.3", optional = true }
+lru = { version = "0.12", optional = true }
 
 pdf_oxide = { version = "0.3", features = ["parallel"] }
 unpdf = { version = "0.2", optional = true }
@@ -28,7 +31,7 @@ tokio = { workspace = true }
 default = ["structured"]
 structured = ["dep:unpdf"]
 visual = ["dep:pdfium-render", "dep:image"]
-async = []
+async = ["dep:tokio", "dep:futures", "dep:lru"]
 all = ["structured", "visual", "async"]
 
 [[bench]]

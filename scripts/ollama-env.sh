@@ -32,7 +32,6 @@ else
     _get_editor() { printf '%s' "${EDITOR:-${VISUAL:-nano}}"; }
     _hash_string() { printf '%s' "$1" | shasum -a 256 2>/dev/null | cut -d' ' -f1 || printf '%s' "$1" | sha256sum 2>/dev/null | cut -d' ' -f1 || echo "unknown"; }
     _mask_value() { local v="$1" l=${#1}; if [ "$l" -gt 12 ]; then printf '%s' "${v:0:4}****${v: -4} ($l chars)"; elif [ "$l" -gt 0 ]; then printf '%s' "****(masked)"; else printf '%s' "(not set)"; fi; }
-    _validate_env_file() { local f="$1" ln=0 er=0; while IFS= read -r line || [ -n "$line" ]; do ln=$((ln+1)); [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue; if [[ ! "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then printf '  ⚠ Line %d: Invalid format\n' "$ln"; er=$((er+1)); fi; done < "$f"; [ "$er" -gt 0 ] && return 1; return 0; }
     _validate_json() { local f="$1"; if command -v python3 &>/dev/null; then python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$f" 2>/dev/null || return 1; elif command -v jq &>/dev/null; then jq empty "$f" 2>/dev/null || return 1; fi; return 0; }
     _dry_run() { if [ "${DRY_RUN:-0}" = "1" ]; then printf '🔍 [DRY RUN] Would execute: %s\n' "$*"; return 0; else "$@"; fi; }
     _grep_env_key() { local r=""; r=$(grep -E "^${1}=" "$2" 2>/dev/null | head -1 | cut -d'=' -f2-) || r=""; printf '%s' "$r"; }
@@ -59,10 +58,12 @@ OLLAMA_VARS=(
     "CUDA_VISIBLE_DEVICES"
     "HIP_VISIBLE_DEVICES"
     "HSA_OVERRIDE_GFX_VERSION"
+    "OLLAMA_CLOUD_API_KEY"
 )
 
 OLLAMA_SECRET_VARS=(
     "OLLAMA_API_KEY"
+    "OLLAMA_CLOUD_API_KEY"
 )
 
 # ─── Usage ────────────────────────────────────────────────────────────────────
@@ -70,8 +71,8 @@ OLLAMA_SECRET_VARS=(
 usage() {
     cat << 'USAGE'
 Ollama Server Configuration Manager (Environment-based)
-
-Usage: ollama-env.sh <command> [arguments]
+Usage:
+  ollama-env.sh <command> [arguments]
 
 Commands:
   list                  List available configurations
@@ -79,6 +80,7 @@ Commands:
   show <name>           Show configuration details
   edit <name>           Edit config in $EDITOR
   validate <name>       Validate config syntax
+  signin <name>         Sign in to Ollama cloud with config
   <name>                Export vars to current shell
   <name> <command>      Run command with config
 
@@ -88,6 +90,7 @@ Flags:
 Examples:
   ollama-env.sh create gpu-heavy
   ollama-env.sh create low-memory
+  ollama-env.sh signin gpu-heavy          # Sign in to cloud
   ollama-env.sh gpu-heavy                 # Export vars
   ollama-env.sh gpu-heavy ollama list     # Run with config
   ollama-env.sh edit gpu-heavy            # Edit in $EDITOR
@@ -97,12 +100,13 @@ Environment Variables:
   OLLAMA_MODELS             Model storage path
   OLLAMA_KEEP_ALIVE         Model memory retention duration (e.g., 5m, -1)
   OLLAMA_NUM_PARALLEL       Max parallel inference requests
-  OLLAMA_MAX_LOADED_MODELS  Max models loaded per GPU
+  OLLAMA_MAX_LOADED_MODELS  Max models per GPU (0 = auto)
   OLLAMA_CONTEXT_LENGTH     Default context window size
   OLLAMA_SCHED_SPREAD       Spread across all GPUs (true/false)
   OLLAMA_DEBUG              Verbose logging (true/false)
   CUDA_VISIBLE_DEVICES      Restrict visible NVIDIA GPUs
   OLLAMA_API_KEY            API key for ollama.com cloud services
+  OLLAMA_CLOUD_API_KEY      Alternative API key for cloud access
 USAGE
     exit 0
 }
@@ -217,6 +221,9 @@ create_account() {
 
 # ─── Debug ──────────────────────────────────────────────────────
 # OLLAMA_DEBUG=false             # Enable verbose debug logging
+
+# ─── Cloud Access ────────────────────────────────────────────────
+# OLLAMA_CLOUD_API_KEY=          # API key for Ollama Cloud
 EOF
 
     chmod 600 "$file"
@@ -294,6 +301,49 @@ edit_account() {
     fi
 }
 
+# ─── Sign In ──────────────────────────────────────────────────────────────────
+
+signin_account() {
+    local name="${1:-}"
+
+    if [ -z "$name" ]; then
+        echo "Error: Configuration name required."
+        echo "Usage: ollama-env.sh signin <name>"
+        exit 1
+    fi
+
+    local file="$OLLAMA_ACCOUNTS_DIR/$name.env"
+
+    if [ ! -f "$file" ]; then
+        echo "Error: Configuration '$name' not found."
+        echo "Create it with: ollama-env.sh create $name"
+        exit 1
+    fi
+
+    # Check directory permissions before sourcing
+    local dir_perms
+    dir_perms=$(stat -f '%A' "$OLLAMA_ACCOUNTS_DIR" 2>/dev/null || stat -c '%a' "$OLLAMA_ACCOUNTS_DIR" 2>/dev/null)
+    if [ "${dir_perms}" != "600" ] && [ "${dir_perms}" != "700" ]; then
+        echo "❌ Error: Accounts directory has unsafe permissions: $dir_perms"
+        exit 1
+    fi
+
+    echo "Loading configuration: $name"
+    set -a
+    # shellcheck disable=SC1090
+    source "$file"
+    set +a
+
+    echo "Signing in to Ollama Cloud..."
+    if command -v ollama &>/dev/null; then
+        ollama signin
+    else
+        echo "Error: ollama command not found in PATH."
+        echo "Install Ollama from https://ollama.com"
+        exit 1
+    fi
+}
+
 # ─── Validate ─────────────────────────────────────────────────────────────────
 
 validate_account() {
@@ -333,6 +383,14 @@ load_account() {
         exit 1
     fi
 
+    # Check directory permissions before sourcing
+    local dir_perms
+    dir_perms=$(stat -f '%A' "$OLLAMA_ACCOUNTS_DIR" 2>/dev/null || stat -c '%a' "$OLLAMA_ACCOUNTS_DIR" 2>/dev/null)
+    if [ "${dir_perms}" != "600" ] && [ "${dir_perms}" != "700" ]; then
+        echo "❌ Error: Accounts directory has unsafe permissions: $dir_perms"
+        exit 1
+    fi
+
     set -a
     # shellcheck disable=SC1090
     source "$file"
@@ -345,6 +403,7 @@ load_account() {
     [ -n "${OLLAMA_NUM_PARALLEL:-}" ] && echo "  Parallel: $OLLAMA_NUM_PARALLEL"
     [ -n "${CUDA_VISIBLE_DEVICES:-}" ] && echo "  CUDA devices: $CUDA_VISIBLE_DEVICES"
     [ -n "${OLLAMA_DEBUG:-}" ] && echo "  Debug: $OLLAMA_DEBUG"
+    [ -n "${OLLAMA_CLOUD_API_KEY:-}" ] && echo "  Cloud API key: $(_mask_value "$OLLAMA_CLOUD_API_KEY")"
 
     echo ""
     echo "Environment variables exported to current shell."
@@ -361,6 +420,14 @@ run_with_account() {
 
     if [ ! -f "$file" ]; then
         echo "Error: Configuration '$name' not found at $file"
+        exit 1
+    fi
+
+    # Check directory permissions before sourcing
+    local dir_perms
+    dir_perms=$(stat -f '%A' "$OLLAMA_ACCOUNTS_DIR" 2>/dev/null || stat -c '%a' "$OLLAMA_ACCOUNTS_DIR" 2>/dev/null)
+    if [ "${dir_perms}" != "600" ] && [ "${dir_perms}" != "700" ]; then
+        echo "❌ Error: Accounts directory has unsafe permissions: $dir_perms"
         exit 1
     fi
 
@@ -388,6 +455,7 @@ case "${1:-}" in
     show) show_account "${2:-}" ;;
     edit) edit_account "${2:-}" ;;
     validate) validate_account "${2:-}" ;;
+    signin) signin_account "${2:-}" ;;
     ""|--help|-h|help) usage ;;
     *)
         if [ -f "$OLLAMA_ACCOUNTS_DIR/$1.env" ]; then

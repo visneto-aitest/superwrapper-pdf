@@ -1,6 +1,14 @@
 use pretty_assertions::assert_eq;
-use superwrapper_pdf::engine::{FastEngine, PdfEngine, StructuredEngine, VisualEngine};
+use superwrapper_pdf::engine::{FastEngine, PdfEngine, StructuredEngine};
+
+#[cfg(feature = "visual")]
+use superwrapper_pdf::engine::VisualEngine;
+
+#[cfg(feature = "visual")]
 use superwrapper_pdf::types::{ExtractionConfig, ExtractionMode, ImageFormat};
+
+#[cfg(not(feature = "visual"))]
+use superwrapper_pdf::types::{ExtractionConfig, ExtractionMode};
 
 fn sample_pdf() -> std::path::PathBuf {
     FastEngine::fixture_pdf("sample.pdf")
@@ -22,6 +30,7 @@ fn test_structured_engine_can_be_created() {
     assert_eq!(engine.name(), "StructuredEngine");
 }
 
+#[cfg(feature = "visual")]
 #[test]
 fn test_visual_engine_can_be_created() {
     let engine = VisualEngine;
@@ -51,6 +60,7 @@ fn test_structured_extraction() {
     assert!(!result.text.is_empty());
 }
 
+#[cfg(feature = "visual")]
 #[test]
 fn test_visual_extraction() {
     let path = sample_pdf();
@@ -109,11 +119,11 @@ fn test_result_contains_source_path() {
 
 #[test]
 fn test_all_engines_implement_trait() {
-    let engines: Vec<Box<dyn PdfEngine>> = vec![
-        Box::new(FastEngine),
-        Box::new(StructuredEngine),
-        Box::new(VisualEngine),
-    ];
+    let mut engines: Vec<Box<dyn PdfEngine>> =
+        vec![Box::new(FastEngine), Box::new(StructuredEngine)];
+
+    #[cfg(feature = "visual")]
+    engines.push(Box::new(VisualEngine));
 
     for engine in engines {
         let _name = engine.name();
@@ -132,6 +142,7 @@ fn test_multipage_extraction() {
     assert_eq!(result.pages.len() as u32, result.page_count);
 }
 
+#[cfg(feature = "visual")]
 #[test]
 fn test_visual_jpeg_format() {
     let path = sample_pdf();
@@ -163,6 +174,7 @@ fn test_structured_parallel() {
     assert!(result.page_count > 0);
 }
 
+#[cfg(feature = "visual")]
 #[test]
 fn test_visual_multipage() {
     let path = sample_pdf();
@@ -202,6 +214,7 @@ fn test_minimal_pdf_structured() {
     assert!(result.page_count > 0);
 }
 
+#[cfg(feature = "visual")]
 #[test]
 fn test_minimal_pdf_visual() {
     let path = minimal_pdf();

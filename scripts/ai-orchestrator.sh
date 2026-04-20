@@ -290,7 +290,7 @@ run_task() {
 
     SELECTED_TOOLS=("${valid_tools[@]}")
 
-    local task_id=$(date +%s)
+    local task_id="$(date +%s)"
     echo "════════════════════════════════════════════════════════════════════"
     echo "  Running Task #$task_id"
     echo "════════════════════════════════════════════════════════════════════"
@@ -311,7 +311,7 @@ run_task() {
     echo "  Creating isolated worktrees..."
     local pids=()
     for tool in "${SELECTED_TOOLS[@]}"; do
-        local worktree=$(create_worktree "$task_id" "$tool")
+        local worktree="$(create_worktree "$task_id" "$tool")"
         echo "  ✅ $tool: $worktree"
 
         # Run in background
@@ -357,15 +357,15 @@ show_status() {
     echo ""
     for task_dir in "$WORKDIR"/*/; do
         [ -d "$task_dir" ] || continue
-        local task_id=$(basename "$task_dir")
+        local task_id="$(basename "$task_dir")"
         echo "  Task #$task_id"
         for tool_dir in "$task_dir"/*/; do
             [ -d "$tool_dir" ] || continue
-            local tool=$(basename "$tool_dir")
+            local tool="$(basename "$tool_dir")"
             if [ -f "$tool_dir/result.json" ]; then
                 echo "    ✅ $tool: completed"
             elif [ -f "$tool_dir/agent.log" ]; then
-                local last_line=$(tail -1 "$tool_dir/agent.log" 2>/dev/null || echo "running")
+                local last_line="$(tail -1 "$tool_dir/agent.log" 2>/dev/null || echo "running")"
                 echo "    ⏳ $tool: $last_line"
             fi
         done

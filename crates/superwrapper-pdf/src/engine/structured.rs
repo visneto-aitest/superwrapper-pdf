@@ -1,6 +1,6 @@
 use crate::engine::PdfEngine;
 use crate::error::{Result, SuperWrapperError};
-use crate::types::{ExtractionConfig, ExtractionResult, PageInfo};
+use crate::types::{ExtractionConfig, ExtractionProgress, ExtractionResult, PageInfo};
 use std::path::Path;
 use unpdf::render::RenderOptions;
 
@@ -40,6 +40,9 @@ impl StructuredEngine {
         let mut all_markdown = String::new();
         let mut all_text = String::new();
 
+        let total_pages = page_range.clone().count() as u32;
+        let mut processed_pages = 0u32;
+
         for page_num in page_range {
             let page_index = page_num as u32;
             if page_index >= page_count {
@@ -71,6 +74,12 @@ impl StructuredEngine {
                 char_count: page_text.len(),
                 text: page_text,
             });
+
+            processed_pages += 1;
+            if let Some(ref callback) = config.progress_callback {
+                let progress = ExtractionProgress::new(processed_pages, total_pages, 0, 0);
+                callback(&progress);
+            }
         }
 
         Ok(ExtractionResult {

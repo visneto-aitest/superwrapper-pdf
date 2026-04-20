@@ -157,7 +157,7 @@ verify_api() {
     if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
         echo "  Verifying Anthropic API key..."
         local response
-        response=$(curl -s -w "\n%{http_code}" \
+        response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
             -H "anthropic-version: 2023-06-01" \
             -H "Content-Type: application/json" \

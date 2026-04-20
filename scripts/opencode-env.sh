@@ -23,6 +23,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
 OPENCODE_ACCOUNTS_DIR="${OPENCODE_ACCOUNTS_DIR:-${HOME}/.config/opencode/accounts}"
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -66,27 +69,11 @@ _grep_env_key() {
     printf '%s' "$result"
 }
 
-# Validate .env file syntax
-_validate_env_file() {
-    local file=$1
-    local line_num=0
-    local errors=0
 
-    while IFS= read -r line || [ -n "$line" ]; do
-        line_num=$((line_num + 1))
-        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-        if [[ ! "$line" =~ ^[A-Z_]+= ]]; then
-            echo "  ⚠ Line $line_num: Invalid format: ${line:0:50}"
-            errors=$((errors + 1))
-        fi
-    done < "$file"
-
-    return $errors
-}
 
 # Validate JSON syntax
 _validate_json() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$file" 2>/dev/null; then
             return 1
@@ -594,6 +581,18 @@ run_with_account() {
 
     if [ ! -f "$file" ]; then
         echo "❌ Error: Account '$name' not found at $file"
+        exit 1
+    fi
+
+    # Validate directory permissions before sourcing
+    local dir_perms
+    if stat -f '%A' "$OPENCODE_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -f '%A' "$OPENCODE_ACCOUNTS_DIR")
+    elif stat -c '%a' "$OPENCODE_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -c '%a' "$OPENCODE_ACCOUNTS_DIR")
+    fi
+    if [ "${dir_perms:-}" != "600" ] && [ "${dir_perms:-}" != "700" ]; then
+        echo "❌ Error: Accounts directory has unsafe permissions: ${dir_perms:-unknown}"
         exit 1
     fi
 

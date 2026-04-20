@@ -58,7 +58,7 @@ USAGE
 
 _ollama_api() {
     local endpoint="$1"
-    curl -sf "http://${OLLAMA_HOST}${endpoint}" 2>/dev/null || echo ""
+    curl -sf --connect-timeout 5 --max-time 10 "http://${OLLAMA_HOST}${endpoint}" 2>/dev/null || echo ""
 }
 
 _ollama_api_post() {
@@ -66,7 +66,7 @@ _ollama_api_post() {
     local data="${2:-{}}"
     curl -sf -X POST "http://${OLLAMA_HOST}${endpoint}" \
         -H "Content-Type: application/json" \
-        -d "$data" 2>/dev/null || echo ""
+        -d "$data" --connect-timeout 5 --max-time 10 2>/dev/null || echo ""
 }
 
 _fmt_bytes() {

@@ -1,0 +1,11 @@
+[package]
+name = "streaming-example"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "streaming-example"
+path = "main.rs"
+
+[dependencies]
+superwrapper-pdf = { path = "../../crates/superwrapper-pdf" }

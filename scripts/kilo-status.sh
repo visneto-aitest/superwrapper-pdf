@@ -145,7 +145,7 @@ check_balance() {
     # Query Kilo Gateway balance
     echo "Checking Kilo Pass balance..."
     local response
-    response=$(curl -s -w "\n%{http_code}" \
+    response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
         -H "Authorization: Bearer $api_key" \
         -H "Content-Type: application/json" \
         "https://app.kilo.ai/api/v1/balance" 2>/dev/null) || {

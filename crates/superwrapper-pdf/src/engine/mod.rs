@@ -5,7 +5,7 @@
 //!
 //! - [`FastEngine`]: High-speed text extraction using `pdf_oxide`
 //! - [`StructuredEngine`]: Markdown/structured content extraction using `unpdf` (feature-gated)
-//! - [`VisualEngine`]: Visual rendering to images using `pdfium-render` (feature-gated)
+//! - Visual rendering to images using `pdfium-render` (feature-gated)
 //!
 //! # Engine Selection Guide
 //!
@@ -24,7 +24,7 @@
 //! methods that integrate with Tokio's runtime.
 
 use crate::error::Result;
-use crate::types::{ExtractionConfig, ExtractionResult};
+use crate::types::{ExtractionChunk, ExtractionConfig, ExtractionResult};
 use std::path::Path;
 
 /// Trait implemented by all PDF extraction engines
@@ -117,6 +117,62 @@ pub trait PdfEngine: Send + Sync {
     fn extract_async(&self, path: &Path, config: &ExtractionConfig) -> Result<ExtractionResult> {
         // Default implementation falls back to sync extraction
         self.extract(path, config)
+    }
+
+    /// Extract content from a PDF file using streaming mode
+    ///
+    /// This method processes PDFs in chunks, yielding partial results as each
+    /// chunk is processed. This is useful for very large PDFs where you want
+    /// to start processing before the entire file is loaded.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the PDF file to extract
+    /// * `config` - Configuration controlling extraction behavior
+    ///
+    /// # Returns
+    ///
+    /// An iterator of [`ExtractionChunk`]s, each containing a batch of pages.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use superwrapper_pdf::{PdfEngine, FastEngine, ExtractionConfig};
+    /// use std::path::Path;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let engine = FastEngine;
+    /// let mut config = ExtractionConfig::default();
+    /// config.streaming = true;
+    ///
+    /// for chunk in engine.extract_streaming(Path::new("document.pdf"), &config)? {
+    ///     let chunk = chunk?;
+    ///     println!("Processed pages {}-{}", chunk.start_page, chunk.end_page);
+    ///     if chunk.is_complete {
+    ///         println!("Extraction complete!");
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn extract_streaming(
+        &self,
+        path: &Path,
+        config: &ExtractionConfig,
+    ) -> Result<Box<dyn Iterator<Item = Result<ExtractionChunk>> + '_>> {
+        // Default implementation returns a single chunk with all pages
+        let result = self.extract(path, config)?;
+        let page_count = result.page_count;
+        let source = result.source;
+
+        let chunks: Vec<Result<ExtractionChunk>> = vec![Ok(ExtractionChunk {
+            pages: result.pages,
+            start_page: 1,
+            end_page: page_count,
+            is_complete: true,
+        })];
+
+        Ok(Box::new(chunks.into_iter()))
     }
 }
 

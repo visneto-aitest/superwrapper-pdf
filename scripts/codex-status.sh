@@ -119,7 +119,7 @@ verify_key() {
     if [ -n "${OPENAI_API_KEY:-}" ]; then
         echo "  Testing OPENAI_API_KEY..."
         local response
-        response=$(curl -s -w "\n%{http_code}" \
+        response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
             -H "Authorization: Bearer $OPENAI_API_KEY" \
             "https://api.openai.com/v1/models" 2>/dev/null) || {
             echo "  ❌ Failed to connect to OpenAI API."

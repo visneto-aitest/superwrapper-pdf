@@ -1,0 +1,12 @@
+[package]
+name = "batch-example"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "batch-example"
+path = "main.rs"
+
+[dependencies]
+superwrapper-pdf = { path = "../../crates/superwrapper-pdf" }
+walkdir = "2"

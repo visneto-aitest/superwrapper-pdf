@@ -63,13 +63,15 @@ pub struct PyExtractionConfig {
 #[pymethods]
 impl PyExtractionConfig {
     #[new]
-    #[pyo3(signature = (mode="fast", page_range=None, password=None, parallel=true, dpi=150))]
+    #[pyo3(signature = (mode="fast", page_range=None, password=None, parallel=true, dpi=150, streaming=false, chunk_size=None))]
     fn new(
         mode: Option<&str>,
         page_range: Option<(u32, u32)>,
         password: Option<String>,
         parallel: Option<bool>,
         dpi: Option<u32>,
+        streaming: Option<bool>,
+        chunk_size: Option<usize>,
     ) -> PyResult<Self> {
         let mode_inner = match mode.unwrap_or("fast").to_lowercase().as_str() {
             "fast" => swp_pdf::ExtractionMode::Fast,
@@ -93,6 +95,9 @@ impl PyExtractionConfig {
             page_range: page_range_inner,
             password,
             parallel: parallel.unwrap_or(true),
+            progress_callback: None,
+            streaming: streaming.unwrap_or(false),
+            chunk_size,
         };
 
         Ok(PyExtractionConfig { inner })

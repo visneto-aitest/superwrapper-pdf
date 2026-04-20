@@ -139,7 +139,7 @@ verify_key() {
     if [ -n "${GEMINI_API_KEY:-}" ]; then
         echo "Verifying Gemini API key..."
         local response
-        response=$(curl -s -w "\n%{http_code}" \
+        response=$(curl -s --connect-timeout 10 --max-time 30 -w "\n%{http_code}" \
             -H "x-goog-api-key: $GEMINI_API_KEY" \
             "https://generativelanguage.googleapis.com/v1beta/models" 2>/dev/null) || {
             echo "  ❌ Failed to connect to Google AI Studio."

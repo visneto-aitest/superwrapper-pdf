@@ -23,6 +23,7 @@ set -euo pipefail
 
 KILO_ACCOUNTS_DIR="${KILO_ACCOUNTS_DIR:-${HOME}/.config/kilo/accounts}"
 KILO_AUTH_FILE="${HOME}/.local/share/kilo/auth.json"
+KILO_OAUTH_DIR="${KILO_OAUTH_DIR:-${HOME}/.config/kilo/oauth-accounts}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source shared library
@@ -33,12 +34,239 @@ else
     # Fallback: define minimal helpers inline
     _get_editor() { printf '%s' "${EDITOR:-${VISUAL:-nano}}"; }
     _hash_string() { printf '%s' "$1" | shasum -a 256 2>/dev/null | cut -d' ' -f1 || printf '%s' "$1" | sha256sum 2>/dev/null | cut -d' ' -f1 || echo "unknown"; }
+    _hash_file() { local f="$1"; if [ -f "$f" ]; then shasum -a 256 "$f" 2>/dev/null | cut -d' ' -f1 || sha256sum "$f" 2>/dev/null | cut -d' ' -f1 || echo "unknown"; else echo "none"; fi; }
     _mask_value() { local v="$1" l=${#1}; if [ "$l" -gt 12 ]; then printf '%s' "${v:0:4}****${v: -4} ($l chars)"; elif [ "$l" -gt 0 ]; then printf '%s' "****(masked)"; else printf '%s' "(not set)"; fi; }
-    _validate_env_file() { local f="$1" ln=0 er=0; while IFS= read -r line || [ -n "$line" ]; do ln=$((ln+1)); [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue; if [[ ! "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then printf '  ⚠ Line %d: Invalid format\n' "$ln"; er=$((er+1)); fi; done < "$f"; [ "$er" -gt 0 ] && return 1; return 0; }
     _validate_json() { local f="$1"; if command -v python3 &>/dev/null; then python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$f" 2>/dev/null || return 1; elif command -v jq &>/dev/null; then jq empty "$f" 2>/dev/null || return 1; fi; return 0; }
     _dry_run() { if [ "${DRY_RUN:-0}" = "1" ]; then printf '🔍 [DRY RUN] Would execute: %s\n' "$*"; return 0; else "$@"; fi; }
     _grep_env_key() { local r=""; r=$(grep -E "^${1}=" "$2" 2>/dev/null | head -1 | cut -d'=' -f2-) || r=""; printf '%s' "$r"; }
 fi
+
+_kilo_oauth_dir() {
+    echo "$KILO_OAUTH_DIR"
+}
+
+_kilo_current_oauth() {
+    local current="$KILO_AUTH_FILE"
+    if [ -f "$current" ]; then
+        _hash_file "$current"
+    fi
+}
+
+_hash_file() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        shasum -a 256 "$file" 2>/dev/null | cut -d' ' -f1 || \
+        sha256sum "$file" 2>/dev/null | cut -d' ' -f1 || \
+        echo "unknown"
+    else
+        echo "none"
+    fi
+}
+
+_kilo_oauth_ensure_dir() {
+    local dir="$(_kilo_oauth_dir)"
+    if [ ! -d "$dir" ]; then
+        mkdir -p "$dir"
+    fi
+}
+
+_kilo_oauth_list() {
+    local dir="$(_kilo_oauth_dir)"
+    if [ ! -d "$dir" ] || [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
+        echo "No OAuth accounts stored."
+        echo "Create one with: kilo-env.sh oauth-create <name>"
+        return
+    fi
+
+    local current_hash
+    current_hash=$(_kilo_current_oauth)
+
+    echo "OAuth accounts (linked to $KILO_AUTH_FILE):"
+    echo ""
+
+    local has_accounts=false
+    for account_dir in "$dir"/*/; do
+        [ -d "$account_dir" ] || continue
+        has_accounts=true
+        local name
+        name=$(basename "$account_dir")
+        local creds_file="${account_dir}auth.json"
+        
+        local marker=""
+        if [ -f "$creds_file" ]; then
+            local account_hash
+            account_hash=$(_hash_file "$creds_file")
+            if [ "$account_hash" = "$current_hash" ]; then
+                marker=" ✓ (active)"
+            fi
+        fi
+
+        local email="unknown"
+        if [ -f "$creds_file" ]; then
+            if command -v python3 &>/dev/null; then
+                email=$(python3 -c "import json, sys; d=json.load(open(sys.argv[1])); print(d.get('email','unknown'))" "$creds_file" 2>/dev/null || echo "unknown")
+            elif command -v jq &>/dev/null; then
+                email=$(jq -r '.email // "unknown"' "$creds_file" 2>/dev/null || echo "unknown")
+            fi
+        fi
+
+        echo "  • ${name}${marker}  ($email)"
+    done
+
+    if [ "$has_accounts" = false ]; then
+        echo "No OAuth accounts stored."
+    fi
+
+    echo ""
+    echo "OAuth accounts directory: $dir"
+}
+
+_kilo_oauth_create() {
+    local name="${1:-}"
+
+    if [ -z "$name" ]; then
+        echo "❌ Error: Account name required."
+        echo "Usage: kilo-env.sh oauth-create <name>"
+        exit 1
+    fi
+
+    if [[ ! "$name" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        echo "❌ Error: Account name can only contain letters, numbers, hyphens, and underscores."
+        exit 1
+    fi
+
+    _kilo_oauth_ensure_dir
+
+    local target_dir="$(_kilo_oauth_dir)/$name"
+    local current_creds="$KILO_AUTH_FILE"
+    local backup_creds="${KILO_AUTH_FILE}.bak"
+
+    if [ -d "$target_dir" ]; then
+        echo "❌ Error: OAuth account '$name' already exists."
+        echo "Switch to it with: kilo-env.sh oauth-switch $name"
+        exit 1
+    fi
+
+    mkdir -p "$target_dir"
+
+    if [ -f "$current_creds" ]; then
+        cp "$current_creds" "$target_dir/auth.json"
+        echo "✅ Created OAuth account: $name"
+        echo "Saved current OAuth credentials to: $target_dir/auth.json"
+    else
+        echo "✅ Created OAuth account: $name"
+        echo "⚠ No current OAuth credentials found."
+        echo "Run 'kilo' first to log in, then run: kilo-env.sh oauth-create"
+    fi
+    echo ""
+    echo "To switch to this account: kilo-env.sh oauth-switch $name"
+}
+
+_kilo_oauth_switch() {
+    local name="${1:-}"
+
+    if [ -z "$name" ]; then
+        echo "❌ Error: Account name required."
+        echo "Usage: kilo-env.sh oauth-switch <name>"
+        exit 1
+    fi
+
+    local source_dir="$(_kilo_oauth_dir)/$name"
+    local source_creds="$source_dir/auth.json"
+    local target_creds="$KILO_AUTH_FILE"
+
+    if [ ! -d "$source_dir" ]; then
+        echo "❌ Error: OAuth account '$name' not found."
+        echo "Available accounts:"
+        _kilo_oauth_list
+        exit 1
+    fi
+
+    if [ ! -f "$source_creds" ]; then
+        echo "❌ Error: No auth.json found for account '$name'."
+        exit 1
+    fi
+
+    if [ -f "$target_creds" ]; then
+        cp "$target_creds" "${target_creds}.bak"
+    fi
+
+    if [ "${DRY_RUN:-}" = "1" ]; then
+        echo "DRY RUN: Would copy $source_creds to $target_creds"
+    else
+        cp "$source_creds" "$target_creds"
+        echo "✅ Switched to OAuth account: $name"
+    fi
+
+    echo ""
+    echo "Now run 'kilo' to use this account."
+}
+
+_kilo_oauth_current() {
+    local current="$KILO_AUTH_FILE"
+    
+    if [ ! -f "$current" ]; then
+        echo "No active OAuth account (no auth.json found)."
+        return
+    fi
+
+    echo "Current OAuth account:"
+    echo "  File: $current"
+    
+    local email="unknown"
+    if command -v python3 &>/dev/null; then
+        email=$(python3 -c "import json, sys; d=json.load(open(sys.argv[1])); print(d.get('email','unknown'))" "$current" 2>/dev/null || echo "unknown")
+    elif command -v jq &>/dev/null; then
+        email=$(jq -r '.email // "unknown"' "$current" 2>/dev/null || echo "unknown")
+    fi
+    echo "  Email: $email"
+
+    local dir="$(_kilo_oauth_dir)"
+    local current_hash
+    current_hash=$(_hash_file "$current")
+    
+    for account_dir in "$dir"/*/; do
+        [ -d "$account_dir" ] || continue
+        local account_name
+        account_name=$(basename "$account_dir")
+        local account_creds="${account_dir}auth.json"
+        
+        if [ -f "$account_creds" ]; then
+            local account_hash
+            account_hash=$(_hash_file "$account_creds")
+            if [ "$account_hash" = "$current_hash" ]; then
+                echo "  Stored as: $account_name"
+                return
+            fi
+        fi
+    done
+    
+    echo "  Stored as: (not stored - run 'kilo-env.sh oauth-create' to save)"
+}
+
+_kilo_oauth_delete() {
+    local name="${1:-}"
+
+    if [ -z "$name" ]; then
+        echo "❌ Error: Account name required."
+        echo "Usage: kilo-env.sh oauth-delete <name>"
+        exit 1
+    fi
+
+    local target_dir="$(_kilo_oauth_dir)/$name"
+
+    if [ ! -d "$target_dir" ]; then
+        echo "❌ Error: OAuth account '$name' not found."
+        exit 1
+    fi
+
+    if [ "${DRY_RUN:-}" = "1" ]; then
+        echo "DRY RUN: Would delete $target_dir"
+    else
+        rm -rf "$target_dir"
+        echo "✅ Deleted OAuth account: $name"
+    fi
+}
 
 # ─── Kilo CLI environment variables ──────────────────────────────────────────
 
@@ -93,6 +321,14 @@ Commands:
   <name>                Export account env vars to current shell
   <name> <command>      Run command with account credentials
 
+OAuth Commands (for switching between Kilo accounts):
+  oauth-list                  List stored OAuth accounts
+  oauth-create <name>         Save current OAuth creds as account
+  oauth-switch <name>         Switch to stored OAuth account
+  oauth-current               Show current OAuth account info
+  oauth-delete <name>         Delete stored OAuth account
+  oauth-login                 Clear creds and trigger new login
+
 Flags:
   DRY_RUN=1             Preview actions without executing
 
@@ -101,10 +337,17 @@ Accounts directory: <dynamic>
 Examples:
   kilo-env.sh create work
   kilo-env.sh work                       # Export vars for current shell
-  kilo-env.sh work kilo                  # Run kilo with work account
-  kilo-env.sh edit work                  # Edit in $EDITOR
-  kilo-env.sh validate work              # Check config syntax
-  DRY_RUN=1 kilo-env.sh work kilo        # Preview without running
+  kilo-env.sh work kilo                 # Run kilo with work account
+  kilo-env.sh edit work                 # Edit in $EDITOR
+  kilo-env.sh validate work             # Check config syntax
+  DRY_RUN=1 kilo-env.sh work kilo      # Preview without running
+
+OAuth Examples:
+  kilo-env.sh oauth-create work        # Save current logged-in account
+  kilo-env.sh oauth-create personal    # Save another account
+  kilo-env.sh oauth-switch work        # Switch to work account
+  kilo-env.sh oauth-list               # List stored OAuth accounts
+  kilo-env.sh oauth-current            # Show current OAuth info
 
 Environment Variables (supported in account files):
   ANTHROPIC_API_KEY     Anthropic provider key
@@ -537,6 +780,18 @@ run_with_account() {
         exit 1
     fi
 
+    # Validate directory permissions before sourcing
+    local dir_perms
+    if stat -f '%A' "$KILO_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -f '%A' "$KILO_ACCOUNTS_DIR")
+    elif stat -c '%a' "$KILO_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -c '%a' "$KILO_ACCOUNTS_DIR")
+    fi
+    if [ "${dir_perms:-}" != "600" ] && [ "${dir_perms:-}" != "700" ]; then
+        echo "❌ Error: Accounts directory has unsafe permissions: ${dir_perms:-unknown}"
+        exit 1
+    fi
+
     (
         set -a
         # shellcheck disable=SC1090
@@ -570,6 +825,27 @@ case "${1:-}" in
         ;;
     validate)
         validate_account "${2:-}"
+        ;;
+    # OAuth commands
+    oauth-list)
+        _kilo_oauth_list
+        ;;
+    oauth-create)
+        _kilo_oauth_create "${2:-}"
+        ;;
+    oauth-switch)
+        _kilo_oauth_switch "${2:-}"
+        ;;
+    oauth-current)
+        _kilo_oauth_current
+        ;;
+    oauth-delete)
+        _kilo_oauth_delete "${2:-}"
+        ;;
+    oauth-login)
+        rm -f "$KILO_AUTH_FILE"
+        echo "✅ Cleared OAuth credentials."
+        echo "Run 'kilo' to log in with a different account."
         ;;
     ""|--help|-h|help)
         usage

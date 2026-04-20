@@ -4,12 +4,19 @@ members = [
     "examples/fast",
     "examples/structured",
     "examples/visual",
-    "examples/async"
+    "examples/async",
+    "examples/streaming",
+    "examples/progress",
+    "examples/encrypted",
+    "examples/page-range",
+    "examples/batch",
+    "examples/error-handling",
+    "examples/serde-output"
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0"
+version = "0.2.1"
 edition = "2021"
 license = "MIT"
 authors = ["Sopaco"]

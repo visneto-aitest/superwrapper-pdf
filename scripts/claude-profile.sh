@@ -33,7 +33,7 @@ _get_editor() {
 }
 
 _validate_json() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$file" 2>/dev/null; then
             return 1
@@ -105,8 +105,8 @@ except:
 
 # List directory contents summary
 _dir_summary() {
-    local dir=$1
-    local name=$2
+    local dir="$1"
+    local name="$2"
     if [ -d "$dir" ]; then
         local count
         count=$(find "$dir" -maxdepth 1 -type f | wc -l | tr -d ' ')

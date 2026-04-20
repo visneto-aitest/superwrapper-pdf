@@ -398,7 +398,7 @@ verify_api_keys() {
         echo -n "  Kilo: "
         if [[ "$KILO_API_KEY" =~ ^kilo_ ]] || [[ "$KILO_API_KEY" =~ ^sk- ]]; then
             local resp
-            resp=$(curl -s -w "%{http_code}" -o /dev/null \
+            resp=$(curl -s --connect-timeout 10 --max-time 30 -w "%{http_code}" -o /dev/null \
                 -H "Authorization: Bearer $KILO_API_KEY" \
                 "https://app.kilo.ai/api/v1/balance" 2>/dev/null) || resp="000"
             case "$resp" in
@@ -416,7 +416,7 @@ verify_api_keys() {
     if [ -n "${OPENAI_API_KEY:-}" ]; then
         echo -n "  OpenAI: "
         local resp
-        resp=$(curl -s -w "%{http_code}" -o /dev/null \
+        resp=$(curl -s --connect-timeout 10 --max-time 30 -w "%{http_code}" -o /dev/null \
             -H "Authorization: Bearer $OPENAI_API_KEY" \
             "https://api.openai.com/v1/models" 2>/dev/null) || resp="000"
         case "$resp" in
@@ -431,7 +431,7 @@ verify_api_keys() {
     if [ -n "${ANTHROPIC_API_KEY:-}" ]; then
         echo -n "  Anthropic: "
         local resp
-        resp=$(curl -s -w "%{http_code}" -o /dev/null \
+        resp=$(curl -s --connect-timeout 10 --max-time 30 -w "%{http_code}" -o /dev/null \
             -H "x-api-key: $ANTHROPIC_API_KEY" \
             -H "anthropic-version: 2023-06-01" \
             -H "Content-Type: application/json" \
@@ -449,7 +449,7 @@ verify_api_keys() {
     if [ -n "${GEMINI_API_KEY:-}" ]; then
         echo -n "  Gemini: "
         local resp
-        resp=$(curl -s -w "%{http_code}" -o /dev/null \
+        resp=$(curl -s --connect-timeout 10 --max-time 30 -w "%{http_code}" -o /dev/null \
             -H "x-goog-api-key: $GEMINI_API_KEY" \
             "https://generativelanguage.googleapis.com/v1beta/models" 2>/dev/null) || resp="000"
         case "$resp" in
@@ -464,7 +464,7 @@ verify_api_keys() {
     if [ -n "${GROQ_API_KEY:-}" ]; then
         echo -n "  Groq: "
         local resp
-        resp=$(curl -s -w "%{http_code}" -o /dev/null \
+        resp=$(curl -s --connect-timeout 10 --max-time 30 -w "%{http_code}" -o /dev/null \
             -H "Authorization: Bearer $GROQ_API_KEY" \
             "https://api.groq.com/openai/v1/models" 2>/dev/null) || resp="000"
         case "$resp" in

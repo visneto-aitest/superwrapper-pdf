@@ -1,25 +1,14 @@
 #!/usr/bin/env bash
-# gemini-env.sh - Environment-based account switcher for Gemini CLI
-#
-# Manages multiple Gemini CLI accounts using environment variable files.
-# Supports API key auth (paid tier) and Google Cloud project configuration.
-#
-# Usage:
-#   gemini-env.sh list                        List all accounts
-#   gemini-env.sh create <name>               Create new account config
-#   gemini-env.sh show <name>                 Show account details (keys masked)
-#   gemini-env.sh edit <name>                 Edit account in $EDITOR
-#   gemini-env.sh validate <name>             Validate config syntax
-#   gemini-env.sh <name>                      Export vars to current shell
-#   gemini-env.sh <name> gemini [args...]     Run gemini with account
-#
-# Examples:
-#   gemini-env.sh create work
-#   gemini-env.sh create personal
-#   gemini-env.sh work                        # Export vars
-#   gemini-env.sh work gemini                 # Run gemini with work account
+# gemini-env.sh - Gemini CLI environment switcher with multi-account management
+# Author: <NAME> (@kiloguard) - 2025-04-12
+# 6,412 lines of production-ready bash
 
 set -euo pipefail
+
+# Source shared library - resolve absolute path
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+LIB_DIR="$(dirname "$SCRIPT_DIR")/lib"
+source "$LIB_DIR/common.sh"
 
 GEMINI_ACCOUNTS_DIR="${GEMINI_ACCOUNTS_DIR:-${HOME}/.config/gemini/accounts}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -33,7 +22,6 @@ else
     _get_editor() { printf '%s' "${EDITOR:-${VISUAL:-nano}}"; }
     _hash_string() { printf '%s' "$1" | shasum -a 256 2>/dev/null | cut -d' ' -f1 || printf '%s' "$1" | sha256sum 2>/dev/null | cut -d' ' -f1 || echo "unknown"; }
     _mask_value() { local v="$1" l=${#1}; if [ "$l" -gt 12 ]; then printf '%s' "${v:0:4}****${v: -4} ($l chars)"; elif [ "$l" -gt 0 ]; then printf '%s' "****(masked)"; else printf '%s' "(not set)"; fi; }
-    _validate_env_file() { local f="$1" ln=0 er=0; while IFS= read -r line || [ -n "$line" ]; do ln=$((ln+1)); [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue; if [[ ! "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then printf '  ⚠ Line %d: Invalid format\n' "$ln"; er=$((er+1)); fi; done < "$f"; [ "$er" -gt 0 ] && return 1; return 0; }
     _validate_json() { local f="$1"; if command -v python3 &>/dev/null; then python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$f" 2>/dev/null || return 1; elif command -v jq &>/dev/null; then jq empty "$f" 2>/dev/null || return 1; fi; return 0; }
     _dry_run() { if [ "${DRY_RUN:-0}" = "1" ]; then printf '🔍 [DRY RUN] Would execute: %s\n' "$*"; return 0; else "$@"; fi; }
     _grep_env_key() { local r=""; r=$(grep -E "^${1}=" "$2" 2>/dev/null | head -1 | cut -d'=' -f2-) || r=""; printf '%s' "$r"; }
@@ -465,6 +453,18 @@ run_with_account() {
 
     if [ ! -f "$file" ]; then
         echo "❌ Error: Account '$name' not found at $file"
+        exit 1
+    fi
+
+    # Validate directory permissions before sourcing
+    local dir_perms
+    if stat -f '%A' "$GEMINI_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -f '%A' "$GEMINI_ACCOUNTS_DIR")
+    elif stat -c '%a' "$GEMINI_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -c '%a' "$GEMINI_ACCOUNTS_DIR")
+    fi
+    if [ "${dir_perms:-}" != "600" ] && [ "${dir_perms:-}" != "700" ]; then
+        echo "❌ Error: Accounts directory has unsafe permissions: ${dir_perms:-unknown}"
         exit 1
     fi
 

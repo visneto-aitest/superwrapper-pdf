@@ -38,6 +38,9 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/common.sh"
+
 QWEN_ACCOUNTS_DIR="${QWEN_ACCOUNTS_DIR:-${HOME}/.config/qwen/accounts}"
 QWEN_OAUTH_DIR="${QWEN_OAUTH_DIR:-${HOME}/.config/qwen/oauth-accounts}"
 
@@ -109,25 +112,10 @@ _grep_env_key() {
     printf '%s' "$result"
 }
 
-_validate_env_file() {
-    local file=$1
-    local line_num=0
-    local errors=0
 
-    while IFS= read -r line || [ -n "$line" ]; do
-        line_num=$((line_num + 1))
-        [[ -z "$line" || "$line" =~ ^[[:space:]]*# ]] && continue
-        if [[ ! "$line" =~ ^[A-Za-z_]+= ]]; then
-            echo "  ⚠ Line $line_num: Invalid format: ${line:0:50}"
-            errors=$((errors + 1))
-        fi
-    done < "$file"
-
-    return $errors
-}
 
 _validate_json() {
-    local file=$1
+    local file="$1"
     if command -v python3 &>/dev/null; then
         if ! python3 -c 'import json,sys; json.load(open(sys.argv[1]))' "$file" 2>/dev/null; then
             return 1
@@ -163,14 +151,14 @@ _is_secret_var() {
 # ─── OAuth Account Management ─────────────────────────────────────────────────
 
 _qwen_oauth_ensure_dir() {
-    local dir=$(_qwen_oauth_dir)
+    local dir="$(_qwen_oauth_dir)"
     if [ ! -d "$dir" ]; then
         mkdir -p "$dir"
     fi
 }
 
 _qwen_oauth_list() {
-    local dir=$(_qwen_oauth_dir)
+    local dir="$(_qwen_oauth_dir)"
     if [ ! -d "$dir" ] || [ -z "$(ls -A "$dir" 2>/dev/null)" ]; then
         echo "No OAuth accounts stored."
         echo "Create one with: qwen-env.sh oauth-create <name>"
@@ -236,7 +224,7 @@ _qwen_oauth_create() {
 
     _qwen_oauth_ensure_dir
 
-    local target_dir=$(_qwen_oauth_dir)/$name
+    local target_dir="$(_qwen_oauth_dir)/$name"
     local current_creds="${HOME}/.qwen/oauth_creds.json"
     local backup_creds="${HOME}/.qwen/oauth_creds.json.bak"
 
@@ -270,7 +258,7 @@ _qwen_oauth_switch() {
         exit 1
     fi
 
-    local source_dir=$(_qwen_oauth_dir)/$name
+    local source_dir="$(_qwen_oauth_dir)/$name"
     local source_creds="$source_dir/oauth_creds.json"
     local target_creds="${HOME}/.qwen/oauth_creds.json"
 
@@ -322,7 +310,7 @@ _qwen_oauth_current() {
     echo "  Email: $email"
 
     # Check if it matches any stored account
-    local dir=$(_qwen_oauth_dir)
+    local dir="$(_qwen_oauth_dir)"
     local current_hash
     current_hash=$(_hash_file "$current")
     
@@ -354,7 +342,7 @@ _qwen_oauth_delete() {
         exit 1
     fi
 
-    local target_dir=$(_qwen_oauth_dir)/$name
+    local target_dir="$(_qwen_oauth_dir)/$name"
 
     if [ ! -d "$target_dir" ]; then
         echo "❌ Error: OAuth account '$name' not found."
@@ -393,7 +381,7 @@ _qwen_oauth_save() {
 
     _qwen_oauth_ensure_dir
 
-    local target_dir=$(_qwen_oauth_dir)/$name
+    local target_dir="$(_qwen_oauth_dir)/$name"
     
     if [ -d "$target_dir" ]; then
         echo "⚠ Account '$name' already exists. Updating..."
@@ -811,6 +799,18 @@ run_with_account() {
 
     if [ ! -f "$file" ]; then
         echo "❌ Error: Account '$name' not found at $file"
+        exit 1
+    fi
+
+    # Validate directory permissions before sourcing
+    local dir_perms
+    if stat -f '%A' "$QWEN_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -f '%A' "$QWEN_ACCOUNTS_DIR")
+    elif stat -c '%a' "$QWEN_ACCOUNTS_DIR" 2>/dev/null; then
+        dir_perms=$(stat -c '%a' "$QWEN_ACCOUNTS_DIR")
+    fi
+    if [ "${dir_perms:-}" != "600" ] && [ "${dir_perms:-}" != "700" ]; then
+        echo "❌ Error: Accounts directory has unsafe permissions: ${dir_perms:-unknown}"
         exit 1
     fi
 

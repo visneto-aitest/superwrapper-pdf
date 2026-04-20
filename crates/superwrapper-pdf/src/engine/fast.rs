@@ -20,7 +20,9 @@
 
 use crate::engine::PdfEngine;
 use crate::error::{Result, SuperWrapperError};
-use crate::types::{ExtractionConfig, ExtractionResult, PageInfo};
+use crate::types::{
+    ExtractionChunk, ExtractionConfig, ExtractionProgress, ExtractionResult, PageInfo,
+};
 use pdf_oxide::document::PdfDocument;
 use std::io::Write;
 use std::path::Path;
@@ -104,6 +106,9 @@ impl FastEngine {
         let mut pages = Vec::new();
         let mut all_text = String::new();
 
+        let total_pages = page_range.clone().count() as u32;
+        let mut processed_pages = 0u32;
+
         for page_num in page_range {
             let text =
                 doc.extract_text(page_num as usize)
@@ -120,6 +125,12 @@ impl FastEngine {
                 char_count: text.len(),
                 text,
             });
+
+            processed_pages += 1;
+            if let Some(ref callback) = config.progress_callback {
+                let progress = ExtractionProgress::new(processed_pages, total_pages, 0, 0);
+                callback(&progress);
+            }
         }
 
         Ok(ExtractionResult {
@@ -160,6 +171,95 @@ impl FastEngine {
             pages,
             source: Some(path.to_path_buf()),
         })
+    }
+
+    pub fn extract_streaming(
+        &self,
+        path: &Path,
+        config: &ExtractionConfig,
+    ) -> Result<Box<dyn Iterator<Item = Result<ExtractionChunk>> + '_>> {
+        let chunk_size = config.chunk_size.unwrap_or(50);
+
+        let page_count = {
+            let mut doc = PdfDocument::open(path).map_err(|e| SuperWrapperError::PdfParse {
+                path: Some(path.to_string_lossy().to_string()),
+                details: e.to_string(),
+            })?;
+            doc.page_count().map_err(|e| SuperWrapperError::PdfParse {
+                path: Some(path.to_string_lossy().to_string()),
+                details: e.to_string(),
+            })? as u32
+        };
+
+        let page_range = config
+            .page_range
+            .clone()
+            .unwrap_or(0..=page_count.saturating_sub(1));
+
+        let pages: Vec<u32> = page_range.collect();
+        let total_pages = pages.len() as u32;
+
+        let path_owned = path.to_path_buf();
+        let chunk_size_usize = chunk_size;
+
+        let chunks: Vec<Result<ExtractionChunk>> = pages
+            .chunks(chunk_size_usize)
+            .enumerate()
+            .map(|(chunk_idx, chunk_pages)| {
+                let mut doc =
+                    PdfDocument::open(&path_owned).map_err(|e| SuperWrapperError::PdfParse {
+                        path: Some(path_owned.to_string_lossy().to_string()),
+                        details: e.to_string(),
+                    });
+
+                if let Err(e) = doc.as_mut() {
+                    return Err(SuperWrapperError::PdfParse {
+                        path: Some(path_owned.to_string_lossy().to_string()),
+                        details: e.to_string(),
+                    });
+                }
+
+                let doc = doc.as_mut().unwrap();
+                let _ = doc.page_count();
+
+                let mut chunk_page_infos = Vec::with_capacity(chunk_pages.len());
+
+                for page_num in chunk_pages {
+                    let text = doc.extract_text(*page_num as usize).map_err(|e| {
+                        SuperWrapperError::PdfParse {
+                            path: Some(path_owned.to_string_lossy().to_string()),
+                            details: e.to_string(),
+                        }
+                    })?;
+
+                    chunk_page_infos.push(PageInfo {
+                        page_number: *page_num + 1,
+                        char_count: text.len(),
+                        text,
+                    });
+                }
+
+                let processed = ((chunk_idx + 1) * chunk_size_usize).min(pages.len()) as u32;
+
+                if let Some(ref callback) = config.progress_callback {
+                    let progress = ExtractionProgress::new(processed, total_pages, 0, 0);
+                    callback(&progress);
+                }
+
+                let is_complete = processed == total_pages;
+                let start_page = chunk_page_infos.first().map(|p| p.page_number).unwrap_or(1);
+                let end_page = chunk_page_infos.last().map(|p| p.page_number).unwrap_or(1);
+
+                Ok(ExtractionChunk::new(
+                    chunk_page_infos,
+                    start_page,
+                    end_page,
+                    is_complete,
+                ))
+            })
+            .collect();
+
+        Ok(Box::new(chunks.into_iter()))
     }
 }
 

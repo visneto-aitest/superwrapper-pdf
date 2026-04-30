@@ -2,3 +2,4 @@ target/CACHEDIR.TAG
 target/
 
  scripts/.qwen/settings.json
+.tdad/logs/
